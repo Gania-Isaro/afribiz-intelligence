@@ -2627,8 +2627,13 @@ function initEventListeners() {
 
   // Theme toggle
   document.getElementById('themeToggle')?.addEventListener('click', () => {
-    const current = document.documentElement.getAttribute('data-theme');
-    document.documentElement.setAttribute('data-theme', current === 'light' ? 'dark' : 'light');
+    const current = document.documentElement.getAttribute('data-theme') || 'dark';
+    const next = current === 'light' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', next);
+    const moon = document.getElementById('theme-icon-moon');
+    const sun  = document.getElementById('theme-icon-sun');
+    if (moon) moon.style.display = next === 'dark'  ? '' : 'none';
+    if (sun)  sun.style.display  = next === 'light' ? '' : 'none';
   });
 
   // Logo → home
