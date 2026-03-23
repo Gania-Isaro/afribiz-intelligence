@@ -304,10 +304,10 @@ function formatDays(n) {
  * @returns {string} CSS variable string
  */
 function getScoreColor(score) {
-  if (score === null || score === undefined) return 'var(--text-muted)';
-  if (score >= 60) return 'var(--score-high)';
-  if (score >= 40) return 'var(--score-mid)';
-  return 'var(--score-low)';
+  if (score === null || score === undefined) return 'var(--text-lo)';
+  if (score >= 60) return 'var(--accent)';
+  if (score >= 40) return 'var(--amber)';
+  return 'var(--red)';
 }
 
 /**
@@ -359,9 +359,9 @@ function trendEmoji(trend) {
  * @returns {string}
  */
 function trendClass(trend) {
-  if (trend === 'up')   return 'style="color:var(--score-high)"';
-  if (trend === 'down') return 'style="color:var(--score-low)"';
-  return 'style="color:var(--text-muted)"';
+  if (trend === 'up')   return 'style="color:var(--accent)"';
+  if (trend === 'down') return 'style="color:var(--red)"';
+  return 'style="color:var(--text-lo)"';
 }
 
 /**
@@ -1450,7 +1450,7 @@ function renderCountryProfile(country) {
   // Hero: flag background
   const heroBg = document.getElementById('profileHeroBg');
   if (heroBg) {
-    heroBg.style.background = `linear-gradient(135deg, ${country.score !== null ? getScoreColor(country.score) + '33' : 'var(--bg-secondary)'}, var(--bg-primary))`;
+    heroBg.style.background = `linear-gradient(135deg, ${country.score !== null ? getScoreColor(country.score) + '33' : 'var(--bg-surface)'}, var(--bg-page))`;
   }
 
   // Flag
@@ -1697,7 +1697,7 @@ function renderProsCons(country) {
   const items = generateProsCons(country);
   if (!items.length) {
     const msg = el('p', { textContent: 'Insufficient data to evaluate strengths and weaknesses.' });
-    msg.style.color = 'var(--text-muted)';
+    msg.style.color = 'var(--text-lo)';
     msg.style.fontSize = '0.875rem';
     container.appendChild(msg);
     return;
@@ -1791,7 +1791,7 @@ function renderSimilarCountries(countryCode) {
 
   const similar = generateSimilarCountries(countryCode);
   if (!similar.length) {
-    container.innerHTML = '<p style="color:var(--text-muted);font-size:0.875rem">Not enough data to suggest similar countries.</p>';
+    container.innerHTML = '<p style="color:var(--text-lo);font-size:0.875rem">Not enough data to suggest similar countries.</p>';
     return;
   }
 
@@ -2023,7 +2023,7 @@ function renderComparisonView() {
   if (countries.length < CONFIG.COMPARISON_MIN) {
     const msg = el('p');
     msg.textContent = 'Select at least 2 countries to compare.';
-    msg.style.color = 'var(--text-muted)';
+    msg.style.color = 'var(--text-lo)';
     container.appendChild(msg);
     return;
   }
@@ -2143,7 +2143,7 @@ function buildComparisonTable(countries) {
         td.textContent = key === 'gdp' ? '$' + formatNumber(val) : val.toFixed(1);
       } else {
         td.textContent = 'N/A';
-        td.style.color = 'var(--text-muted)';
+        td.style.color = 'var(--text-lo)';
       }
       row.appendChild(td);
     });
@@ -2252,9 +2252,9 @@ function renderRankingsTable() {
 
     const trend = country.historicalScores?.length ? getTrendArrow(country.historicalScores.slice().reverse()) : 'stable';
     const trendCell = el('td', { className: 'td-trend', textContent: trendEmoji(trend) });
-    if (trend === 'up')   trendCell.style.color = 'var(--score-high)';
-    if (trend === 'down') trendCell.style.color = 'var(--score-low)';
-    if (trend === 'stable') trendCell.style.color = 'var(--text-muted)';
+    if (trend === 'up')   trendCell.style.color = 'var(--accent)';
+    if (trend === 'down') trendCell.style.color = 'var(--red)';
+    if (trend === 'stable') trendCell.style.color = 'var(--text-lo)';
     tr.appendChild(trendCell);
 
     tbody.appendChild(tr);
