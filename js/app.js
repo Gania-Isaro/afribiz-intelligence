@@ -810,32 +810,40 @@ function generateInsights(countries) {
  * Clears the grid first, then builds featured (top 3) and regular cards.
  */
 function renderCountryCards() {
-  const grid = document.getElementById('cardsGrid');
+  const grid       = document.getElementById('cardsGrid');
   const emptyState = document.getElementById('emptyState');
-  const emptyTerm = document.getElementById('emptyTerm');
+  const emptyTerm  = document.getElementById('emptyTerm');
   const pagination = document.getElementById('pagination');
 
   if (!grid) return;
 
+  // Always clear first, then reset states
   grid.innerHTML = '';
+  if (emptyState) emptyState.hidden = true;
+  if (pagination) pagination.hidden = true;
 
-  if (STATE.filtered.length === 0) {
-    emptyState.hidden = false;
-    if (emptyTerm) emptyTerm.textContent = `"${sanitizeInput(STATE.filters.search)}"`;
-    if (pagination) pagination.hidden = true;
+  if (!STATE.filtered || STATE.filtered.length === 0) {
+    if (emptyState) {
+      emptyState.hidden = false;
+      if (emptyTerm) {
+        const term = sanitizeInput(STATE.filters.search || '');
+        emptyTerm.textContent = term ? `"${term}"` : 'Try adjusting your filters';
+      }
+    }
     return;
   }
-
-  emptyState.hidden = true;
 
   const { currentPage } = STATE;
   const start = (currentPage - 1) * CONFIG.ITEMS_PER_PAGE;
   const end   = start + CONFIG.ITEMS_PER_PAGE;
   const page  = STATE.filtered.slice(start, end);
 
+  // Featured treatment only when 3+ results exist on page 1
+  const useFeatured = currentPage === 1 && STATE.filtered.length >= 3;
+
   page.forEach((country, pageIndex) => {
     const globalIndex = start + pageIndex;
-    const isFeatured = globalIndex < 3 && currentPage === 1;
+    const isFeatured  = useFeatured && globalIndex < 2;
     const card = isFeatured
       ? buildFeaturedCard(country)
       : buildRegularCard(country);
@@ -1534,72 +1542,88 @@ function renderIndicatorsList(country) {
   if (!list) return;
   list.innerHTML = '';
 
-  // Collect all African values per indicator for normalisation bars
   const indicatorEntries = Object.entries(INDICATORS);
+  let shownCount = 0;
 
   for (const [key, indicator] of indicatorEntries) {
     const datum = country.indicators[key];
     const hasValue = datum && datum.value !== null && !isNaN(datum.value);
 
+    // Skip rows with no data — only show what we have
+    if (!hasValue) continue;
+
+    shownCount++;
+
     const allValues = STATE.countries
       .map(c => c.indicators[key]?.value)
       .filter(v => v != null && !isNaN(v));
 
-    let barPct = 0;
+    let barPct = 50;
     let bandClass = 'ind-mid';
 
-    if (hasValue && allValues.length) {
+    if (allValues.length > 1) {
       const min = Math.min(...allValues);
       const max = Math.max(...allValues);
-      const raw = datum.value;
-      barPct = max === min ? 50 : ((raw - min) / (max - min)) * 100;
+      barPct = max === min ? 50 : ((datum.value - min) / (max - min)) * 100;
       if (indicator.inverted) barPct = 100 - barPct;
       bandClass = barPct >= 65 ? 'ind-high' : barPct >= 35 ? 'ind-mid' : 'ind-low';
     }
 
-    // Trend from historical data (if available)
-    const trendHistory = STATE.countries
-      .filter(c => c.code === country.code)[0]
-      ?.historicalScores || [];
-    const trend = trendHistory.length ? getTrendArrow(trendHistory) : 'stable';
+    const bandLabel = barPct >= 65 ? 'Top 25%' : barPct >= 35 ? 'Mid 50%' : 'Bot 25%';
+    const bandCls   = barPct >= 65 ? 'band-high' : barPct >= 35 ? 'band-mid' : 'band-low';
+
+    // Format the value with its unit
+    let displayVal;
+    if (key === 'gdp') {
+      displayVal = '$' + formatNumber(datum.value);
+    } else if (indicator.unit && indicator.unit.includes('%')) {
+      displayVal = datum.value.toFixed(1) + '%';
+    } else if (indicator.unit && indicator.unit.toLowerCase().includes('day')) {
+      displayVal = formatDays(datum.value);
+    } else {
+      displayVal = datum.value.toFixed(1);
+    }
+
+    // Include data year if available
+    const yearLabel = datum.year ? ` (${datum.year})` : '';
 
     const row = el('div', { className: 'indicator-row' });
 
-    const nameEl = el('div', { className: 'indicator-name', textContent: indicator.label });
-
-    const valEl = el('div', {
-      className: `indicator-val mono${!hasValue ? ' na' : ''}`,
-    });
-
-    if (hasValue) {
-      let displayVal = datum.value.toFixed(key === 'gdp' ? 0 : 1);
-      if (key === 'gdp') displayVal = '$' + formatNumber(datum.value);
-      else displayVal = displayVal + ' ' + (indicator.unit.split(' ')[0] === '%' ? '%' : '');
-      valEl.textContent = displayVal;
-      valEl.title = indicator.description;
-    } else {
-      valEl.textContent = 'N/A';
-      valEl.title = 'Data not reported by World Bank';
+    // Name + description
+    const nameBlock = el('div', { className: 'indicator-name-block' });
+    nameBlock.appendChild(el('div', { className: 'indicator-name', textContent: indicator.label }));
+    if (indicator.description) {
+      nameBlock.appendChild(el('div', { className: 'indicator-desc', textContent: indicator.description + yearLabel }));
     }
 
+    // Value
+    const valEl = el('div', { className: 'indicator-val mono', textContent: displayVal });
+
+    // Bar
     const barWrap = el('div', { className: 'indicator-bar' });
-    const barFill = el('div', { className: `indicator-bar-fill ${hasValue ? bandClass : ''}` });
-    barFill.style.width = hasValue ? `${barPct}%` : '0%';
+    const barFill = el('div', { className: `indicator-bar-fill ${bandClass}` });
+    barFill.style.width = `${Math.max(barPct, 3)}%`;
     barWrap.appendChild(barFill);
 
-    const bandEl = el('div', {
-      className: `indicator-band ${hasValue ? 'band-' + (barPct >= 65 ? 'high' : barPct >= 35 ? 'mid' : 'low') : ''}`,
-      textContent: hasValue ? (barPct >= 65 ? 'Top 25%' : barPct >= 35 ? 'Mid 50%' : 'Bot 25%') : '',
-    });
+    // Band label (Top/Mid/Bot)
+    const bandEl = el('div', { className: `indicator-band ${bandCls}`, textContent: bandLabel });
 
+    // Trend arrow
     const trendEl = el('div', { className: 'indicator-trend' });
+    const histScores = country.historicalScores || [];
+    const trend = histScores.length >= 2 ? getTrendArrow(histScores) : 'stable';
     trendEl.textContent = trendEmoji(trend);
-    if (trend === 'up')   trendEl.style.color = 'var(--score-high)';
-    if (trend === 'down') trendEl.style.color = 'var(--score-low)';
-    if (trend === 'stable') trendEl.style.color = 'var(--text-muted)';
+    trendEl.className = `indicator-trend ${trend === 'up' ? 'trend-up' : trend === 'down' ? 'trend-down' : 'trend-flat'}`;
 
-    row.append(nameEl, valEl, barWrap, bandEl, trendEl);
+    row.append(nameBlock, valEl, barWrap, bandEl, trendEl);
     list.appendChild(row);
+  }
+
+  // If no data at all, show a helpful message
+  if (shownCount === 0) {
+    const msg = el('p', { className: 'indicators-no-data' });
+    msg.textContent = 'No indicator data available for this country in the World Bank database.';
+    list.appendChild(msg);
   }
 }
 
