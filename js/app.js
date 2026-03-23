@@ -11,35 +11,35 @@
    All settings, constants, and lookup tables. Edit freely.
    ============================================================ */
 const CONFIG = {
-  // API base URLs
-  WORLD_BANK_BASE: 'https://api.worldbank.org/v2',
+  // ── Core APIs (no key required) ───────────────────────────
+  WORLD_BANK_BASE:     'https://api.worldbank.org/v2',
   REST_COUNTRIES_BASE: 'https://restcountries.com/v3.1',
 
-  // Cache duration in milliseconds (4 hours)
-  CACHE_DURATION_MS: 4 * 60 * 60 * 1000,
+  // ── GNews API — business headlines per country ────────────
+  // Free: 100 req/day  Sign up: https://gnews.io
+  // Paste your key here after signing up:
+  GNEWS_API_KEY:  '',
+  GNEWS_BASE:     'https://gnews.io/api/v4',
 
-  // Number of country cards per page
-  ITEMS_PER_PAGE: 12,
+  // ── ExchangeRate-API — live currency conversion ───────────
+  // Free: 1,500 req/month  Sign up: https://app.exchangerate-api.com
+  // Paste your key here after signing up:
+  EXCHANGE_RATE_KEY:  '',
+  EXCHANGE_RATE_BASE: 'https://v6.exchangerate-api.com/v6',
 
-  // API request timeout in milliseconds
+  // ── App settings ──────────────────────────────────────────
+  CACHE_DURATION_MS:  4 * 60 * 60 * 1000,
+  NEWS_CACHE_MS:      30 * 60 * 1000,
+  ITEMS_PER_PAGE:     12,
   REQUEST_TIMEOUT_MS: 12000,
-
-  // Insights ticker rotation interval (ms)
   TICKER_INTERVAL_MS: 6000,
-
-  // Toast auto-dismiss duration (ms)
-  TOAST_DURATION_MS: 4500,
-
-  // Historical data range
-  DATA_YEAR_START: 2015,
-  DATA_YEAR_END: 2023,
-
-  // Minimum countries needed in comparison
-  COMPARISON_MIN: 2,
-  COMPARISON_MAX: 3,
-
-  // Debounce delay for search (ms)
+  TOAST_DURATION_MS:  4500,
+  DATA_YEAR_START:    2015,
+  DATA_YEAR_END:      2023,
+  COMPARISON_MIN:     2,
+  COMPARISON_MAX:     3,
   SEARCH_DEBOUNCE_MS: 280,
+  NEWS_ARTICLE_COUNT: 3,
 };
 
 /* ============================================================
@@ -304,8 +304,8 @@ function formatDays(n) {
  * @returns {string} CSS variable string
  */
 function getScoreColor(score) {
-  if (score === null || score === undefined) return 'var(--text-lo)';
-  if (score >= 60) return 'var(--accent)';
+  if (score === null || score === undefined) return 'var(--text-3)';
+  if (score >= 60) return 'var(--green)';
   if (score >= 40) return 'var(--amber)';
   return 'var(--red)';
 }
@@ -359,9 +359,9 @@ function trendEmoji(trend) {
  * @returns {string}
  */
 function trendClass(trend) {
-  if (trend === 'up')   return 'style="color:var(--accent)"';
+  if (trend === 'up')   return 'style="color:var(--green)"';
   if (trend === 'down') return 'style="color:var(--red)"';
-  return 'style="color:var(--text-lo)"';
+  return 'style="color:var(--text-3)"';
 }
 
 /**
@@ -604,6 +604,160 @@ async function fetchHistoricalData(countryCode) {
 }
 
 /* ============================================================
+   SECTION: GNEWS API — Business headlines per country
+   Free tier: 100 req/day — https://gnews.io
+   Gracefully skipped when GNEWS_API_KEY is empty.
+   ============================================================ */
+
+/**
+ * Fetches up to 3 recent news articles about business/economy
+ * in a given country. Returns [] if no key set or request fails.
+ * @param {string} countryName - Full country name e.g. "Rwanda"
+ * @returns {Promise<Array<{title,description,url,source,publishedAt}>>}
+ */
+async function fetchCountryNews(countryName) {
+  if (!CONFIG.GNEWS_API_KEY) return [];
+
+  const cacheKey = `news_${countryName.replace(/\s+/g, '_').toLowerCase()}`;
+  const cached   = getCachedData(cacheKey);
+  if (cached && (Date.now() - cached.timestamp < CONFIG.NEWS_CACHE_MS)) {
+    return cached.data;
+  }
+
+  const query = encodeURIComponent(`${countryName} business economy`);
+  const url   = `${CONFIG.GNEWS_BASE}/search?q=${query}&lang=en&country=any&max=${CONFIG.NEWS_ARTICLE_COUNT}&apikey=${CONFIG.GNEWS_API_KEY}`;
+
+  const response = await fetchWithTimeout(url);
+  if (!response || !response.ok) return [];
+
+  try {
+    const json = await response.json();
+    if (!json.articles || !json.articles.length) return [];
+    const articles = json.articles.map(a => ({
+      title:       a.title       || '',
+      description: a.description || '',
+      url:         a.url         || '#',
+      source:      a.source?.name || 'News',
+      publishedAt: a.publishedAt  || '',
+    }));
+    cacheData(cacheKey, articles);
+    return articles;
+  } catch (_) {
+    return [];
+  }
+}
+
+/* ============================================================
+   SECTION: EXCHANGERATE API — Live currency conversion
+   Free tier: 1,500 req/month — https://app.exchangerate-api.com
+   Gracefully skipped when EXCHANGE_RATE_KEY is empty.
+   ============================================================ */
+
+/**
+ * Fetches live exchange rates for a given base currency (USD by default).
+ * Returns a rates object or null if no key set or request fails.
+ * @param {string} base - Base currency code e.g. "USD"
+ * @returns {Promise<Object|null>} e.g. { EUR: 0.91, KES: 129.4, ... }
+ */
+async function fetchExchangeRates(base = 'USD') {
+  if (!CONFIG.EXCHANGE_RATE_KEY) return null;
+
+  const cacheKey = `fx_${base}`;
+  const cached   = getCachedData(cacheKey);
+  if (cached && (Date.now() - cached.timestamp < CONFIG.NEWS_CACHE_MS)) {
+    return cached.data;
+  }
+
+  const url = `${CONFIG.EXCHANGE_RATE_BASE}/${CONFIG.EXCHANGE_RATE_KEY}/latest/${base}`;
+  const response = await fetchWithTimeout(url);
+  if (!response || !response.ok) return null;
+
+  try {
+    const json = await response.json();
+    if (json.result !== 'success' || !json.conversion_rates) return null;
+    cacheData(cacheKey, json.conversion_rates);
+    return json.conversion_rates;
+  } catch (_) {
+    return null;
+  }
+}
+
+/**
+ * Renders the live exchange rate for a country's primary currency
+ * into a given container element. Shows nothing if no key is set.
+ * @param {Object}      country   - Country data object
+ * @param {HTMLElement} container - Element to inject the rate pill into
+ */
+async function renderExchangeRate(country, container) {
+  if (!CONFIG.EXCHANGE_RATE_KEY || !container) return;
+
+  // Extract currency code from stored string like "KSh, $" or "RWF"
+  const rawCurrency = country.currencies || '';
+  const rates = await fetchExchangeRates('USD');
+  if (!rates) return;
+
+  // Try to match a known 3-letter currency code
+  // REST Countries stores symbols; we do a best-effort lookup via country code
+  const COUNTRY_CURRENCY_MAP = {
+    RW:'RWF', KE:'KES', TZ:'TZS', UG:'UGX', NG:'NGN', GH:'GHS',
+    ZA:'ZAR', EG:'EGP', ET:'ETB', MA:'MAD', TN:'TND', SN:'XOF',
+    CI:"XOF", CM:'XAF', MZ:'MZN', MG:'MGA', AO:'AOA', ZM:'ZMW',
+    ZW:'ZWL', SD:'SDG', MU:'MUR', BW:'BWP', NA:'NAD', MR:'MRO',
+    ML:'XOF', BJ:'XOF', TG:'XOF', NE:'XOF', BF:'XOF', GN:'GNF',
+    SL:'SLL', LR:'LRD', GM:'GMD', GW:'XOF', CV:'CVE', ST:'STN',
+    SS:'SSP', ER:'ERN', DJ:'DJF', SO:'SOS', KM:'KMF', SC:'SCR',
+    BI:'BIF', RW:'RWF', MW:'MWK', LS:'LSL', SZ:'SZL', CD:'CDF',
+    CG:'XAF', GA:'XAF', GQ:'XAF', CF:'XAF', TD:'XAF', LY:'LYD',
+    DZ:'DZD', MR:'MRU', TN:'TND',
+  };
+
+  const code = COUNTRY_CURRENCY_MAP[country.code];
+  if (!code || !rates[code]) return;
+
+  const rate    = rates[code];
+  const display = rate < 1 ? (1 / rate).toFixed(4) + ' USD = 1 ' + code
+                            : '1 USD = ' + rate.toFixed(2) + ' ' + code;
+
+  const pill = el('span', { className: 'fx-pill', textContent: '💱 ' + display });
+  pill.title = 'Live exchange rate via ExchangeRate-API';
+  container.appendChild(pill);
+}
+
+/**
+ * Renders recent news headlines into a given container element.
+ * Skipped entirely when GNEWS_API_KEY is empty.
+ * @param {string}      countryName - Country name for search query
+ * @param {HTMLElement} container   - Element to inject news into
+ */
+async function renderNewsSection(countryName, container) {
+  if (!CONFIG.GNEWS_API_KEY || !container) return;
+
+  const articles = await fetchCountryNews(countryName);
+  if (!articles.length) return;
+
+  const section = el('div', { className: 'profile-section news-section' });
+  const title   = el('div', { className: 'profile-section-title', textContent: 'Recent Business News' });
+  const list    = el('div', { className: 'news-list' });
+
+  articles.forEach(article => {
+    const item    = el('a', { className: 'news-item', href: article.url, target: '_blank', rel: 'noopener noreferrer' });
+    const meta    = el('div', { className: 'news-meta' });
+    const source  = el('span', { className: 'news-source', textContent: article.source });
+    const date    = el('span', { className: 'news-date', textContent: article.publishedAt ? new Date(article.publishedAt).toLocaleDateString() : '' });
+    meta.append(source, date);
+
+    const headline = el('div', { className: 'news-headline', textContent: article.title });
+    const desc     = el('div', { className: 'news-desc', textContent: article.description });
+
+    item.append(meta, headline, desc);
+    list.appendChild(item);
+  });
+
+  section.append(title, list);
+  container.appendChild(section);
+}
+
+/* ============================================================
    SECTION: SCORE MODULE
    Normalises raw indicator values and calculates composite score.
    ============================================================ */
@@ -838,16 +992,8 @@ function renderCountryCards() {
   const end   = start + CONFIG.ITEMS_PER_PAGE;
   const page  = STATE.filtered.slice(start, end);
 
-  // Featured treatment only when 3+ results exist on page 1
-  const useFeatured = currentPage === 1 && STATE.filtered.length >= 3;
-
-  page.forEach((country, pageIndex) => {
-    const globalIndex = start + pageIndex;
-    const isFeatured  = useFeatured && globalIndex < 2;
-    const card = isFeatured
-      ? buildFeaturedCard(country)
-      : buildRegularCard(country);
-    grid.appendChild(card);
+  page.forEach(country => {
+    grid.appendChild(buildCountryCard(country));
   });
 
   renderPagination();
@@ -858,229 +1004,119 @@ function renderCountryCards() {
  * @param {Object} country - Country data object
  * @returns {HTMLElement}
  */
-function buildFeaturedCard(country) {
-  const band = getScoreBand(country.score);
+/**
+ * Builds a single unified country card (all cards look the same).
+ * Shows flag, name, score, registration days, tax rate, and a score bar.
+ * @param {Object} country - Country data object
+ * @returns {HTMLElement}
+ */
+function buildCountryCard(country) {
+  const band   = getScoreBand(country.score);
   const inComp = STATE.selected.includes(country.code);
-  const className = [
-    'country-card featured',
-    `score-${band}`,
-    inComp ? 'in-comparison' : '',
-  ].join(' ');
+  const cls    = ['country-card', `score-${band}`, inComp ? 'in-comparison' : ''].filter(Boolean).join(' ');
 
   const card = el('div', {
-    className,
+    className: cls,
     role: 'article',
     'data-code': country.code,
-    'aria-label': `${country.name} business profile`,
+    'aria-label': `${country.name} — business score ${country.score !== null ? country.score.toFixed(1) : 'N/A'}`,
   });
 
-  // Header
-  const header = el('div', { className: 'card-header' });
-  const flag   = el('div', { className: 'card-flag', textContent: country.flag });
-  const nameWrap = el('div', { className: 'card-name-wrap' });
-  const name     = el('div', { className: 'card-name', textContent: country.name });
-  const region   = el('div', { className: 'card-region', textContent: country.region || 'Africa' });
-  nameWrap.append(name, region);
+  // Inner padding wrapper
+  const inner = el('div', { className: 'card-inner' });
 
-  const scoreBadge = el('div', {
-    className: `card-score-badge badge-${band} mono`,
-    textContent: country.score !== null ? country.score.toFixed(1) : 'N/A',
+  // ── Top row: flag + name + score badge ──
+  const top   = el('div', { className: 'card-top' });
+  const left  = el('div', { className: 'card-left' });
+  const flag  = el('div', { className: 'card-flag',   textContent: country.flag || '🌍' });
+  const info  = el('div');
+  const name  = el('div', { className: 'card-name',   textContent: country.name });
+  const region= el('div', { className: 'card-region', textContent: country.region || 'Africa' });
+  info.append(name, region);
+  left.append(flag, info);
+
+  const score = el('div', {
+    className: `card-score badge-${band}`,
+    textContent: country.score !== null ? country.score.toFixed(1) : '—',
+    title: 'Business environment score out of 100',
   });
+  top.append(left, score);
+  inner.appendChild(top);
 
-  header.append(flag, nameWrap, scoreBadge);
-  card.appendChild(header);
-
-  // Stats
+  // ── Stats row: registration days + tax rate ──
   const stats = el('div', { className: 'card-stats' });
-  const statDays = buildCardStat(
-    country.indicators.daysToRegister?.value != null
-      ? formatDays(country.indicators.daysToRegister.value) : 'N/A',
-    'Registration'
-  );
-  const statTax = buildCardStat(
-    country.indicators.taxRate?.value != null
-      ? country.indicators.taxRate.value.toFixed(1) + '%' : 'N/A',
-    'Tax Rate'
-  );
-  const statLegal = buildCardStat(
-    country.indicators.legalRights?.value != null
-      ? country.indicators.legalRights.value.toFixed(0) + '/12' : 'N/A',
-    'Legal Rights'
-  );
-  stats.append(statDays, statTax, statLegal);
-  card.appendChild(stats);
 
-  // Progress bar
+  const days = country.indicators.daysToRegister?.value;
+  const tax  = country.indicators.taxRate?.value;
+
+  const statDays = el('div', { className: 'card-stat' });
+  statDays.appendChild(el('div', { className: 'card-stat-val', textContent: days != null ? formatDays(days) : '—' }));
+  statDays.appendChild(el('div', { className: 'card-stat-lbl', textContent: 'To Register' }));
+
+  const statTax = el('div', { className: 'card-stat' });
+  statTax.appendChild(el('div', { className: 'card-stat-val', textContent: tax != null ? tax.toFixed(1) + '%' : '—' }));
+  statTax.appendChild(el('div', { className: 'card-stat-lbl', textContent: 'Tax Rate' }));
+
+  stats.append(statDays, statTax);
+  inner.appendChild(stats);
+
+  // ── Score progress bar ──
   if (country.score !== null) {
-    const prog = el('div', { className: 'card-progress' });
-    const fill = el('div', { className: 'card-progress-fill' });
-    fill.style.width = `${country.score}%`;
+    const bar  = el('div', { className: 'card-bar' });
+    const fill = el('div', { className: 'card-bar-fill' });
+    fill.style.width      = `${country.score}%`;
     fill.style.background = getScoreColor(country.score);
-    prog.appendChild(fill);
-    card.appendChild(prog);
+    bar.appendChild(fill);
+    inner.appendChild(bar);
   }
 
-  // Featured extras
-  const extras = el('div', { className: 'card-featured-extras' });
+  card.appendChild(inner);
 
-  if (country.indicators.gdp?.value != null) {
-    const gdp = el('span', {
-      className: 'card-gdp',
-      textContent: `GDP: $${formatNumber(country.indicators.gdp.value)}`,
-    });
-    extras.appendChild(gdp);
-  }
-
-  const strength = el('span', {
-    className: 'card-strength',
-    textContent: getTopStrength(country),
+  // ── Footer: rank + explore button ──
+  const footer  = el('div', { className: 'card-footer' });
+  const rankEl  = el('div', {
+    className: 'card-rank',
+    textContent: country.africanRank ? `#${country.africanRank} in Africa` : 'Unranked',
   });
-  extras.appendChild(strength);
 
-  card.appendChild(extras);
+  const exploreBtn = el('button', { className: 'card-explore-btn' });
+  exploreBtn.textContent = STATE.compareMode ? '＋ Compare' : 'Explore →';
+  exploreBtn.classList.toggle('card-compare-btn', STATE.compareMode);
+  if (inComp) exploreBtn.classList.add('added');
 
-  // Footer
-  card.appendChild(buildCardFooter(country));
+  footer.append(rankEl, exploreBtn);
+  card.appendChild(footer);
 
-  // Click handlers
-  card.addEventListener('click', (e) => {
-    if (e.target.closest('.card-explore-btn')) return;
-    handleCardClick(country.code);
-  });
-  const exploreBtn = card.querySelector('.card-explore-btn');
-  if (exploreBtn) {
-    exploreBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
+  // ── Event listeners ──
+  card.addEventListener('click', () => handleCardClick(country.code));
+  exploreBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    if (STATE.compareMode) {
+      addToComparison(country.code);
+    } else {
       navigateToProfile(country.code);
-    });
-  }
+    }
+  });
 
   return card;
 }
 
-/**
- * Builds a standard-size country card.
- * @param {Object} country - Country data object
- * @returns {HTMLElement}
- */
-function buildRegularCard(country) {
-  const band = getScoreBand(country.score);
-  const inComp = STATE.selected.includes(country.code);
-  const className = [
-    'country-card',
-    `score-${band}`,
-    inComp ? 'in-comparison' : '',
-  ].join(' ');
-
-  const card = el('div', {
-    className,
-    role: 'article',
-    'data-code': country.code,
-    'aria-label': `${country.name} business profile`,
-  });
-
-  // Header
-  const header = el('div', { className: 'card-header' });
-  const flag   = el('div', { className: 'card-flag', textContent: country.flag });
-  const nameWrap = el('div', { className: 'card-name-wrap' });
-  const name   = el('div', { className: 'card-name', textContent: country.name });
-  const region = el('div', { className: 'card-region', textContent: country.region || 'Africa' });
-  nameWrap.append(name, region);
-
-  const scoreBadge = el('div', {
-    className: `card-score-badge badge-${band} mono`,
-    textContent: country.score !== null ? country.score.toFixed(1) : 'N/A',
-  });
-  header.append(flag, nameWrap, scoreBadge);
-  card.appendChild(header);
-
-  // Stats
-  const stats = el('div', { className: 'card-stats' });
-  stats.append(
-    buildCardStat(
-      country.indicators.daysToRegister?.value != null
-        ? formatDays(country.indicators.daysToRegister.value) : 'N/A',
-      'Registration'
-    ),
-    buildCardStat(
-      country.indicators.taxRate?.value != null
-        ? country.indicators.taxRate.value.toFixed(1) + '%' : 'N/A',
-      'Tax Rate'
-    )
-  );
-  card.appendChild(stats);
-
-  // Progress bar
-  if (country.score !== null) {
-    const prog = el('div', { className: 'card-progress' });
-    const fill = el('div', { className: 'card-progress-fill' });
-    fill.style.width = `${country.score}%`;
-    fill.style.background = getScoreColor(country.score);
-    prog.appendChild(fill);
-    card.appendChild(prog);
-  }
-
-  card.appendChild(buildCardFooter(country));
-
-  // Click handlers
-  card.addEventListener('click', (e) => {
-    if (e.target.closest('.card-explore-btn')) return;
-    handleCardClick(country.code);
-  });
-  const exploreBtn = card.querySelector('.card-explore-btn');
-  if (exploreBtn) {
-    exploreBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      navigateToProfile(country.code);
-    });
-  }
-
-  return card;
-}
+/* backwards-compat aliases so nothing else breaks */
+function buildFeaturedCard(c) { return buildCountryCard(c); }
+function buildRegularCard(c)  { return buildCountryCard(c); }
 
 /**
- * Builds a single stat sub-block for a card.
- * @param {string} value - Formatted value string
- * @param {string} key   - Label string
- * @returns {HTMLElement}
- */
-function buildCardStat(value, key) {
-  const stat = el('div', { className: 'card-stat' });
-  const val  = el('div', { className: 'card-stat-val mono', textContent: value });
-  const lbl  = el('div', { className: 'card-stat-key', textContent: key });
-  stat.append(val, lbl);
-  return stat;
-}
-
-/**
- * Builds the card footer with rank and explore button.
- * @param {Object} country - Country data object
- * @returns {HTMLElement}
- */
-function buildCardFooter(country) {
-  const footer = el('div', { className: 'card-footer' });
-  const rank = el('span', {
-    className: 'card-rank mono',
-    textContent: country.africanRank ? `#${country.africanRank} Africa` : 'Unranked',
-  });
-  const btn = el('button', { className: 'card-explore-btn', 'data-code': country.code });
-  btn.textContent = 'Explore';
-  footer.append(rank, btn);
-  return footer;
-}
-
-/**
- * Returns a short top-strength label based on indicator values.
- * @param {Object} country - Country data object
+ * Returns the single most notable strength label for a country.
+ * @param {Object} country
  * @returns {string}
  */
 function getTopStrength(country) {
-  const ind = country.indicators;
-  if (ind.daysToRegister?.value != null && ind.daysToRegister.value <= 5) return '⚡ Fast Setup';
-  if (ind.taxRate?.value != null && ind.taxRate.value < 25) return '💚 Low Tax';
-  if (ind.legalRights?.value != null && ind.legalRights.value >= 9) return '⚖️ Strong Rights';
-  if (ind.corruption?.value != null && ind.corruption.value < 15) return '✅ Low Corruption';
-  if (country.score !== null && country.score >= 65) return '🏆 Top Performer';
+  const i = country.indicators;
+  if (i.daysToRegister?.value != null && i.daysToRegister.value <= 5) return '⚡ Fast Setup';
+  if (i.taxRate?.value        != null && i.taxRate.value        <  25) return '💚 Low Tax';
+  if (i.legalRights?.value    != null && i.legalRights.value    >= 9)  return '⚖️ Strong Rights';
+  if (i.corruption?.value     != null && i.corruption.value     <  15) return '✅ Low Corruption';
+  if (country.score !== null  && country.score >= 65) return '🏆 Top Performer';
   return '📊 Explore Data';
 }
 
@@ -1450,7 +1486,7 @@ function renderCountryProfile(country) {
   // Hero: flag background
   const heroBg = document.getElementById('profileHeroBg');
   if (heroBg) {
-    heroBg.style.background = `linear-gradient(135deg, ${country.score !== null ? getScoreColor(country.score) + '33' : 'var(--bg-surface)'}, var(--bg-page))`;
+    heroBg.style.background = `linear-gradient(135deg, ${country.score !== null ? getScoreColor(country.score) + '33' : 'var(--surface)'}, var(--bg))`;
   }
 
   // Flag
@@ -1697,7 +1733,7 @@ function renderProsCons(country) {
   const items = generateProsCons(country);
   if (!items.length) {
     const msg = el('p', { textContent: 'Insufficient data to evaluate strengths and weaknesses.' });
-    msg.style.color = 'var(--text-lo)';
+    msg.style.color = 'var(--text-3)';
     msg.style.fontSize = '0.875rem';
     container.appendChild(msg);
     return;
@@ -1791,7 +1827,7 @@ function renderSimilarCountries(countryCode) {
 
   const similar = generateSimilarCountries(countryCode);
   if (!similar.length) {
-    container.innerHTML = '<p style="color:var(--text-lo);font-size:0.875rem">Not enough data to suggest similar countries.</p>';
+    container.innerHTML = '<p style="color:var(--text-3);font-size:0.875rem">Not enough data to suggest similar countries.</p>';
     return;
   }
 
@@ -2023,7 +2059,7 @@ function renderComparisonView() {
   if (countries.length < CONFIG.COMPARISON_MIN) {
     const msg = el('p');
     msg.textContent = 'Select at least 2 countries to compare.';
-    msg.style.color = 'var(--text-lo)';
+    msg.style.color = 'var(--text-3)';
     container.appendChild(msg);
     return;
   }
@@ -2143,7 +2179,7 @@ function buildComparisonTable(countries) {
         td.textContent = key === 'gdp' ? '$' + formatNumber(val) : val.toFixed(1);
       } else {
         td.textContent = 'N/A';
-        td.style.color = 'var(--text-lo)';
+        td.style.color = 'var(--text-3)';
       }
       row.appendChild(td);
     });
@@ -2252,9 +2288,9 @@ function renderRankingsTable() {
 
     const trend = country.historicalScores?.length ? getTrendArrow(country.historicalScores.slice().reverse()) : 'stable';
     const trendCell = el('td', { className: 'td-trend', textContent: trendEmoji(trend) });
-    if (trend === 'up')   trendCell.style.color = 'var(--accent)';
+    if (trend === 'up')   trendCell.style.color = 'var(--green)';
     if (trend === 'down') trendCell.style.color = 'var(--red)';
-    if (trend === 'stable') trendCell.style.color = 'var(--text-lo)';
+    if (trend === 'stable') trendCell.style.color = 'var(--text-3)';
     tr.appendChild(trendCell);
 
     tbody.appendChild(tr);
