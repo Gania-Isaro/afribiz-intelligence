@@ -1,0 +1,49 @@
+# ============================================================
+# AfriBiz Intelligence — .gitignore
+# ============================================================
+
+# Environment variables — NEVER commit API keys or secrets
+.env
+.env.*
+*.env
+
+# Node modules (if you ever add a build step)
+node_modules/
+package-lock.json
+
+# macOS system files
+.DS_Store
+.AppleDouble
+.LSOverride
+**/.DS_Store
+
+# Windows system files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Editor / IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Log files
+*.log
+logs/
+npm-debug.log*
+
+# Build output
+dist/
+build/
+.cache/
+
+# Temporary files
+tmp/
+temp/
+
+# OS thumbnails and caches
+*.pid
+*.seed
+*.pid.lock
