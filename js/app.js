@@ -30,7 +30,7 @@ const CONFIG = {
   // ── App settings ──────────────────────────────────────────
   CACHE_DURATION_MS:  6 * 60 * 60 * 1000,
   NEWS_CACHE_MS:      30 * 60 * 1000,
-  ITEMS_PER_PAGE:     16,
+  ITEMS_PER_PAGE:     12,
   REQUEST_TIMEOUT_MS: 12000,
   TICKER_INTERVAL_MS: 8000,
   TOAST_DURATION_MS:  5500,
