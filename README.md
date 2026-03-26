@@ -15,7 +15,7 @@
 
 Access the application via the load balancer:
 ```
-http://<LB01_IP>/
+https://afribiz-intelligence.gania.tech
 ```
 
 Direct server access:
@@ -138,7 +138,33 @@ sudo systemctl enable nginx
 curl http://localhost/
 ```
 
-### Step 2 — Configure the HAProxy Load Balancer (Lb01)
+### Step 2 — Get a Free SSL Certificate (on Lb01)
+
+Run these commands on **Lb01** before configuring HAProxy:
+
+```bash
+# Install certbot
+sudo apt update && sudo apt install certbot -y
+
+# Get the certificate (standalone mode — temporarily uses port 80)
+# Make sure port 80 is open and nothing is already listening on it
+sudo certbot certonly --standalone \
+  -d afribiz-intelligence.gania.tech \
+  --non-interactive --agree-tos \
+  -m g.kayumba@alustudent.com
+
+# HAProxy needs the cert and key combined into a single .pem file
+sudo mkdir -p /etc/haproxy/certs
+sudo cat /etc/letsencrypt/live/afribiz-intelligence.gania.tech/fullchain.pem \
+         /etc/letsencrypt/live/afribiz-intelligence.gania.tech/privkey.pem \
+  | sudo tee /etc/haproxy/certs/afribiz.pem > /dev/null
+sudo chmod 600 /etc/haproxy/certs/afribiz.pem
+
+# Set up auto-renewal (runs twice daily, renews when <30 days left)
+sudo crontab -l 2>/dev/null; echo "0 0,12 * * * certbot renew --quiet --deploy-hook 'cat /etc/letsencrypt/live/afribiz-intelligence.gania.tech/fullchain.pem /etc/letsencrypt/live/afribiz-intelligence.gania.tech/privkey.pem > /etc/haproxy/certs/afribiz.pem && systemctl reload haproxy'" | sudo crontab -
+```
+
+### Step 3 — Configure the HAProxy Load Balancer (Lb01)
 
 Run these commands on **Lb01**:
 
@@ -179,11 +205,29 @@ sudo systemctl enable haproxy
 # Hit the load balancer 6 times and note which server responds
 for i in {1..6}; do curl -s http://<LB01_IP>/ | head -5; echo "---"; done
 
-# Check HAProxy stats (if stats enabled in config)
-# Visit: http://<LB01_IP>:8404/stats
+# Check HAProxy stats — password protected, localhost only
+# SSH tunnel first, then open in browser:
+ssh -L 8404:127.0.0.1:8404 ubuntu@<LB01_IP>
+# Visit: http://127.0.0.1:8404/stats
+# Credentials: admin / Afr1B1z$tat5!  (change this before deploying)
 ```
 
 You should see traffic alternating between Web01 and Web02.
+
+### Security Features in the Load Balancer
+
+The HAProxy config includes the following hardening:
+
+| Feature | Detail |
+|---|---|
+| **Rate limiting** | Blocks IPs exceeding 100 requests / 10 seconds (HTTP 429) |
+| **Attack path blocking** | Denies `/wp-admin`, `/.env`, `/phpmyadmin`, `/xmlrpc.php`, etc. |
+| **Host header validation** | Rejects requests with empty or duplicate Host headers |
+| **Stats page auth** | Stats endpoint protected with password and bound to `127.0.0.1` only |
+| **Server fingerprint removal** | `Server` and `X-Powered-By` headers stripped from all responses |
+| **Security response headers** | `X-Frame-Options`, `X-Content-Type-Options`, `X-XSS-Protection`, `Referrer-Policy`, `Permissions-Policy` injected at the LB |
+| **CSP (Nginx)** | `Content-Security-Policy` header restricts scripts, styles, fonts, and API origins |
+| **TLS config** | SSL ciphers and min TLS 1.2 pre-configured for when HTTPS is added |
 
 ---
 
