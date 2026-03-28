@@ -43,6 +43,12 @@ build/
 tmp/
 temp/
 
+# Claude Code internals
+.claude/
+
+# Nested repo copy
+afribiz-intelligence/
+
 # OS thumbnails and caches
 *.pid
 *.seed
