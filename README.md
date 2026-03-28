@@ -43,7 +43,8 @@ I wanted to keep this project simple and fast, so I didn't use any fancy framewo
 - **Vanilla JavaScript:** For all the logic and fetching data.
 - **World Bank API:** This is where all the economic data comes from. — [Documentation](https://datahelpdesk.worldbank.org/knowledgebase/topics/125589)
 - **REST Countries API:** Used for flags and basic country info. — [Documentation](https://restcountries.com)
-- **GNews API:** To show the latest business headlines. — [Documentation](https://gnews.io/docs) | Key: `4fccb62daf321b4ad5855fde84e13a73`
+- **GNews API:** To show the latest business headlines. — [Documentation](https://gnews.io/docs)
+- **ExchangeRate-API:** Provides live currency conversion rates. — [Documentation](https://www.exchangerate-api.com)
 
 ---
 
@@ -70,6 +71,18 @@ To make sure the app is always online and fast, I set up a professional web infr
 
 ---
 
+## Challenges Faced & How I Overcame Them
+Building this was exciting, but I ran into a few roadblocks:
+
+- **Missing Data:** Many countries didn't have data for every year in the World Bank database.
+  - **Solution:** I implemented a "Most Recent Value" (MRV) filter to ensure we always get the latest available information.
+- **API Limits:** Free API tiers for news and exchange rates have daily limits.
+  - **Solution:** I built a custom **caching system** using `localStorage` so that data is saved for a few hours, reducing the number of requests.
+- **Complexity without Frameworks:** Managing everything in Vanilla JS can get messy.
+  - **Solution:** I used a centralized **State Management** pattern to keep the logic organized and easy to debug.
+
+---
+
 ## What I Learned
 Working on this project was a huge learning experience for me. I learned:
 - How to fetch and handle data from multiple APIs at once.
@@ -80,10 +93,19 @@ Working on this project was a huge learning experience for me. I learned:
 
 ---
 
+## Credits & Acknowledgments
+I want to say a huge thank you to the following API providers for making their data accessible:
+- **[World Bank API](https://datahelpdesk.worldbank.org/knowledgebase/topics/125589)** for the economic indicators — free, no key required.
+- **[REST Countries API](https://restcountries.com)** for the national meta-data and flags — free, no key required.
+- **[GNews API](https://gnews.io/docs)** for the business news headlines — free tier, 100 requests/day.
+- **[ExchangeRate-API](https://www.exchangerate-api.com/docs)** for the live currency conversion rates — free tier available.
+
+---
+
 ## Project Info
 - **School:** African Leadership University (ALU)
 - **Course:** Web Infrastructure
-- **Year:** 2025
+- **Year:** 2026
 - **Author:** Gania Isaro
 
 ---
