@@ -41,9 +41,9 @@ Or directly through the servers:
 I wanted to keep this project simple and fast, so I didn't use any fancy frameworks like React or Vue. It's built with:
 - **HTML5 & CSS3:** For the structure and beautiful design.
 - **Vanilla JavaScript:** For all the logic and fetching data.
-- **World Bank API:** This is where all the economic data comes from.
-- **REST Countries API:** Used for flags and basic country info.
-- **GNews API:** To show the latest business headlines.
+- **World Bank API:** This is where all the economic data comes from. — [Documentation](https://datahelpdesk.worldbank.org/knowledgebase/topics/125589)
+- **REST Countries API:** Used for flags and basic country info. — [Documentation](https://restcountries.com)
+- **GNews API:** To show the latest business headlines. — [Documentation](https://gnews.io/docs) | Key: `4fccb62daf321b4ad5855fde84e13a73`
 
 ---
 
