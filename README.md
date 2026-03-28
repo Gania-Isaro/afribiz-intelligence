@@ -20,8 +20,8 @@ https://afribiz-intelligence.gania.tech
 
 Direct server access:
 ```
-http://<WEB01_IP>/
-http://<WEB02_IP>/
+http://52.70.87.10
+http://3.93.218.74
 ```
 
 ---
@@ -207,7 +207,7 @@ for i in {1..6}; do curl -s http://<LB01_IP>/ | head -5; echo "---"; done
 
 # Check HAProxy stats — password protected, localhost only
 # SSH tunnel first, then open in browser:
-ssh -L 8404:127.0.0.1:8404 ubuntu@<LB01_IP>
+ssh -L 8404:127.0.0.1:8404 ubuntu@3.89.88.69
 # Visit: http://127.0.0.1:8404/stats
 # Credentials: admin / Afr1B1z$tat5!  (change this before deploying)
 ```
