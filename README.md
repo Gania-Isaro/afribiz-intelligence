@@ -19,7 +19,7 @@ By putting all this data in one place, the dashboard saves time, reduces confusi
 
 ## Try it Out!
 You can access the live app through our load balancer:
-- **Main Link:** [http://3.89.88.69/](http://3.89.88.69/)
+- **Main Link:** [https://afribiz-intelligence.gania.tech](https://afribiz-intelligence.gania.tech)
 
 Or directly through the servers:
 - [http://52.70.87.10/](http://52.70.87.10/)
