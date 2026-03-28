@@ -28,12 +28,12 @@ const CONFIG = {
   EXCHANGE_RATE_BASE: 'https://v6.exchangerate-api.com/v6',
 
   // ── App settings ──────────────────────────────────────────
-  CACHE_DURATION_MS:  6 * 60 * 60 * 1000,
+  CACHE_DURATION_MS:  4 * 60 * 60 * 1000,
   NEWS_CACHE_MS:      30 * 60 * 1000,
   ITEMS_PER_PAGE:     12,
   REQUEST_TIMEOUT_MS: 12000,
-  TICKER_INTERVAL_MS: 8000,
-  TOAST_DURATION_MS:  5500,
+  TICKER_INTERVAL_MS: 6000,
+  TOAST_DURATION_MS:  4500,
   DATA_YEAR_START:    2015,
   DATA_YEAR_END:      2024,
   COMPARISON_MIN:     2,
