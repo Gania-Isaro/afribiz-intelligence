@@ -799,7 +799,10 @@ function renderMiniLeaderboard() {
     const item = el('li', { className: 'leaderboard-item' });
     const rank = el('span', { className: 'lb-rank mono', textContent: String(i + 1) });
     const name = el('button', { className: 'lb-name' });
-    name.textContent = `${country.flag} ${country.name}`;
+    const lbImg = el('img', { src: `https://flagcdn.com/w20/${country.code.toLowerCase()}.png`, alt: '', loading: 'lazy', style: 'width:14px;height:auto;border-radius:1px;vertical-align:middle;margin-right:4px' });
+    lbImg.onerror = () => { lbImg.replaceWith(document.createTextNode(country.flag + ' ')); };
+    name.appendChild(lbImg);
+    name.appendChild(document.createTextNode(country.name));
     name.addEventListener('click', () => navigateToProfile(country.code));
 
     const barWrap = el('div', { className: 'lb-score-bar-wrap' });
@@ -1766,7 +1769,11 @@ function renderRankingsTable() {
     const tr = el('tr', { className: cls });
 
     tr.appendChild(el('td', { className: 'td-rank mono', textContent: String(i + 1) }));
-    tr.appendChild(el('td', { className: 'td-flag', textContent: country.flag || '' }));
+    const flagTd = el('td', { className: 'td-flag' });
+    const flagImg = el('img', { src: `https://flagcdn.com/w40/${country.code.toLowerCase()}.png`, alt: country.name, loading: 'lazy' });
+    flagImg.onerror = () => { flagTd.textContent = country.flag || country.code; };
+    flagTd.appendChild(flagImg);
+    tr.appendChild(flagTd);
     tr.appendChild(el('td', { className: 'td-name', textContent: country.name }));
 
     const scoreCell = el('td', { className: 'td-score mono' });
@@ -1898,7 +1905,10 @@ function updateCompareUI() {
     const country = STATE.countries.find(c => c.code === code);
     if (!country) return;
     const chip = el('div', { className: 'compare-chip' });
-    chip.appendChild(document.createTextNode(`${country.flag} ${country.name}`));
+    const chipImg = el('img', { src: `https://flagcdn.com/w20/${country.code.toLowerCase()}.png`, alt: '', loading: 'lazy', style: 'width:13px;height:auto;border-radius:1px;vertical-align:middle;margin-right:3px' });
+    chipImg.onerror = () => { chipImg.replaceWith(document.createTextNode(country.flag + ' ')); };
+    chip.appendChild(chipImg);
+    chip.appendChild(document.createTextNode(country.name));
     const remove = el('button', { className: 'chip-remove', 'aria-label': `Remove ${country.name}` });
     remove.textContent = '×';
     remove.addEventListener('click', () => removeFromComparison(code));

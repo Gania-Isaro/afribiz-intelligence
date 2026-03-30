@@ -541,6 +541,7 @@ ul, ol { list-style:none; }
 .rankings-table tr.row-bottom td:first-child { border-left:3px solid var(--red);   padding-left:10px; }
 .td-rank  { color:var(--text-3); font-size:.72rem; }
 .td-flag  { font-size:1.1rem; }
+.td-flag img { width:22px; height:auto; border-radius:2px; display:block; }
 .td-name  { font-family:var(--body); font-weight:600; color:var(--text); cursor:pointer; transition:color var(--t); }
 .td-name:hover { color:var(--green); }
 .td-score { color:var(--green); font-weight:600; }
