@@ -20,7 +20,7 @@ const CONFIG = {
 };
 
 // Bump this version whenever INDICATORS change to invalidate old localStorage cache
-const CACHE_VERSION = 'v3';
+const CACHE_VERSION = 'v4';
 
 // World Bank indicators used for scoring.
 // inverted: true means lower raw value = better (e.g. inflation, unemployment)
@@ -342,6 +342,7 @@ async function fetchRestCountries() {
         : 'N/A',
       languages: c.languages ? Object.values(c.languages).slice(0, 2).join(', ') : 'N/A',
       flag: c.flag || '',
+      flagImg: c.flags?.png || c.flags?.svg || '',
       region: c.subregion || c.region || 'Africa',
     }));
     cacheData(cacheKey, simplified);
@@ -636,7 +637,7 @@ function buildCountryCard(country) {
   const top   = el('div', { className: 'card-top' });
   const left  = el('div', { className: 'card-left' });
   const flag  = el('div', { className: 'card-flag' });
-  const flagImg = el('img', { src: `https://flagcdn.com/w40/${country.code.toLowerCase()}.png`, alt: country.name, loading: 'lazy' });
+  const flagImg = el('img', { src: country.flagImg || `https://flagcdn.com/w40/${country.code.toLowerCase()}.png`, alt: country.name, loading: 'lazy' });
   flagImg.onerror = () => { flag.textContent = country.flag || country.code; };
   flag.appendChild(flagImg);
   const info  = el('div');
@@ -799,7 +800,7 @@ function renderMiniLeaderboard() {
     const item = el('li', { className: 'leaderboard-item' });
     const rank = el('span', { className: 'lb-rank mono', textContent: String(i + 1) });
     const name = el('button', { className: 'lb-name' });
-    const lbImg = el('img', { src: `https://flagcdn.com/w20/${country.code.toLowerCase()}.png`, alt: '', loading: 'lazy', style: 'width:14px;height:auto;border-radius:1px;vertical-align:middle;margin-right:4px' });
+    const lbImg = el('img', { src: country.flagImg || `https://flagcdn.com/w20/${country.code.toLowerCase()}.png`, alt: '', loading: 'lazy', style: 'width:14px;height:auto;border-radius:1px;vertical-align:middle;margin-right:4px' });
     lbImg.onerror = () => { lbImg.replaceWith(document.createTextNode(country.flag + ' ')); };
     name.appendChild(lbImg);
     name.appendChild(document.createTextNode(country.name));
@@ -1059,7 +1060,7 @@ function renderCountryProfile(country) {
   const flagEl = document.getElementById('profileFlag');
   if (flagEl) {
     flagEl.innerHTML = '';
-    const img = el('img', { src: `https://flagcdn.com/w80/${country.code.toLowerCase()}.png`, alt: country.name });
+    const img = el('img', { src: country.flagImg || `https://flagcdn.com/w80/${country.code.toLowerCase()}.png`, alt: country.name });
     img.onerror = () => { flagEl.textContent = country.flag || country.code; };
     flagEl.appendChild(img);
   }
@@ -1350,7 +1351,7 @@ function renderSimilarCountries(countryCode) {
   for (const s of similar) {
     const card = el('div', { className: 'similar-card', 'data-code': s.code });
     const flag = el('span', { className: 'similar-flag' });
-    const sfImg = el('img', { src: `https://flagcdn.com/w40/${s.code.toLowerCase()}.png`, alt: s.name, loading: 'lazy' });
+    const sfImg = el('img', { src: s.flagImg || `https://flagcdn.com/w40/${s.code.toLowerCase()}.png`, alt: s.name, loading: 'lazy' });
     sfImg.onerror = () => { flag.textContent = s.flag || s.code; };
     flag.appendChild(sfImg);
     const info = el('div');
@@ -1571,7 +1572,7 @@ function renderComparisonView() {
   countries.forEach((country, ci) => {
     const col = el('div', { className: 'comparison-col-header' });
     const cfWrap = el('div', { className: 'comparison-flag' });
-    const cfImg = el('img', { src: `https://flagcdn.com/w80/${country.code.toLowerCase()}.png`, alt: country.name });
+    const cfImg = el('img', { src: country.flagImg || `https://flagcdn.com/w80/${country.code.toLowerCase()}.png`, alt: country.name });
     cfImg.onerror = () => { cfWrap.textContent = country.flag || country.code; };
     cfWrap.appendChild(cfImg);
     col.appendChild(cfWrap);
@@ -1770,7 +1771,7 @@ function renderRankingsTable() {
 
     tr.appendChild(el('td', { className: 'td-rank mono', textContent: String(i + 1) }));
     const flagTd = el('td', { className: 'td-flag' });
-    const flagImg = el('img', { src: `https://flagcdn.com/w40/${country.code.toLowerCase()}.png`, alt: country.name, loading: 'lazy' });
+    const flagImg = el('img', { src: country.flagImg || `https://flagcdn.com/w40/${country.code.toLowerCase()}.png`, alt: country.name, loading: 'lazy' });
     flagImg.onerror = () => { flagTd.textContent = country.flag || country.code; };
     flagTd.appendChild(flagImg);
     tr.appendChild(flagTd);
@@ -1905,7 +1906,7 @@ function updateCompareUI() {
     const country = STATE.countries.find(c => c.code === code);
     if (!country) return;
     const chip = el('div', { className: 'compare-chip' });
-    const chipImg = el('img', { src: `https://flagcdn.com/w20/${country.code.toLowerCase()}.png`, alt: '', loading: 'lazy', style: 'width:13px;height:auto;border-radius:1px;vertical-align:middle;margin-right:3px' });
+    const chipImg = el('img', { src: country.flagImg || `https://flagcdn.com/w20/${country.code.toLowerCase()}.png`, alt: '', loading: 'lazy', style: 'width:13px;height:auto;border-radius:1px;vertical-align:middle;margin-right:3px' });
     chipImg.onerror = () => { chipImg.replaceWith(document.createTextNode(country.flag + ' ')); };
     chip.appendChild(chipImg);
     chip.appendChild(document.createTextNode(country.name));
