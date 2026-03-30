@@ -270,6 +270,11 @@
   <!-- TOAST NOTIFICATIONS -->
   <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="false"></div>
 
-  <script src="js/app.js?v=9"></script>
+  <script src="js/app.js?v=11"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js');
+    }
+  </script>
 </body>
 </html>

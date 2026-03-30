@@ -2327,6 +2327,9 @@ async function init() {
   STATE.countries = countries;
   STATE.dataLoaded = true;
 
+  // If we ended up online (live or cached path), ensure the banner is hidden
+  if (navigator.onLine && offlineBannerEl) offlineBannerEl.hidden = true;
+
   applyFilters();
 
   hideLoadingSkeleton();
