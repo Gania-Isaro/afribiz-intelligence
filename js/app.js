@@ -1,35 +1,13 @@
-/* ============================================================
-   AfriBiz Intelligence — Main Application
-   Architecture: Plain JS modules, no frameworks, no build step
-   Author: AfriBiz Intelligence
-   ============================================================ */
-
+// AfriBiz Intelligence — plain JS, no build step
 'use strict';
 
-/* ============================================================
-   SECTION: CONFIGURATION
-   All settings, constants, and lookup tables. Edit freely.
-   ============================================================ */
+// --- CONFIG ---
 const CONFIG = {
-  // ── Core APIs (no key required) ───────────────────────────
+  // World Bank + REST Countries — no keys needed
   WORLD_BANK_BASE:     'https://api.worldbank.org/v2',
   REST_COUNTRIES_BASE: 'https://restcountries.com/v3.1',
 
-  // ── GNews API — business headlines per country ────────────
-  // Free: 100 req/day  Sign up: https://gnews.io
-  // Paste your key here after signing up:
-  GNEWS_API_KEY:  '4fccb62daf321b4ad5855fde84e13a73',
-  GNEWS_BASE:     '/api/news',
-
-  // ── ExchangeRate-API — live currency conversion ───────────
-  // Free: 1,500 req/month  Sign up: https://app.exchangerate-api.com
-  // Paste your key here after signing up:
-  EXCHANGE_RATE_KEY:  'c772e53941e3e01b7bdfb6e9',
-  EXCHANGE_RATE_BASE: 'https://v6.exchangerate-api.com/v6',
-
-  // ── App settings ──────────────────────────────────────────
   CACHE_DURATION_MS:  4 * 60 * 60 * 1000,
-  NEWS_CACHE_MS:      30 * 60 * 1000,
   ITEMS_PER_PAGE:     12,
   REQUEST_TIMEOUT_MS: 12000,
   TICKER_INTERVAL_MS: 6000,
@@ -39,20 +17,13 @@ const CONFIG = {
   COMPARISON_MIN:     2,
   COMPARISON_MAX:     3,
   SEARCH_DEBOUNCE_MS: 280,
-  NEWS_ARTICLE_COUNT: 3,
 };
 
-// Increment this when INDICATORS change to bust stale localStorage cache
+// Bump this version whenever INDICATORS change to invalidate old localStorage cache
 const CACHE_VERSION = 'v3';
 
-/* ============================================================
-   INDICATOR DEFINITIONS
-   Uses actively-maintained World Bank indicators (all updated 2020–present).
-   The legacy Doing Business series (IC.BUS/REG/TAX/LGL) was discontinued
-   in 2021 and returns null for all countries — these are replacements.
-   Higher normalizedScore always = better business environment.
-   Set `inverted: true` for indicators where lower raw = better.
-   ============================================================ */
+// World Bank indicators used for scoring.
+// inverted: true means lower raw value = better (e.g. inflation, unemployment)
 const INDICATORS = {
   gdpPerCapita: {
     code: 'NY.GDP.PCAP.CD',
@@ -120,10 +91,7 @@ const INDICATORS = {
   },
 };
 
-/* ============================================================
-   AFRICAN COUNTRY CODES (ISO 3166-1 alpha-2)
-   Add or remove codes here to adjust which countries appear.
-   ============================================================ */
+// All 54 African nations by ISO 3166-1 alpha-2 code
 const AFRICAN_COUNTRY_CODES = [
   'DZ','AO','BJ','BW','BF','BI','CV','CM','CF','TD',
   'KM','CG','CD','CI','DJ','EG','GQ','ER','SZ','ET',
@@ -133,11 +101,7 @@ const AFRICAN_COUNTRY_CODES = [
   'UG','ZM','ZW','SC',
 ];
 
-/* ============================================================
-   SECTION: STATE
-   Single source of truth for all application state.
-   Never scatter variables outside this object.
-   ============================================================ */
+// --- STATE ---
 const STATE = {
   countries: [],          // All country objects with fetched data
   filtered: [],           // Currently displayed (post-filter) list
@@ -162,17 +126,7 @@ const STATE = {
   tableSort: { col: 'rank', order: 'asc' },
 };
 
-/* ============================================================
-   SECTION: CACHE MODULE
-   localStorage-based caching with expiry. Fails silently.
-   ============================================================ */
-
-/**
- * Saves data to localStorage with a timestamp.
- * Silently fails if storage is unavailable or full.
- * @param {string} key   - Storage key
- * @param {*}      data  - Any JSON-serialisable value
- */
+// --- CACHE ---
 function cacheData(key, data) {
   try {
     const payload = { timestamp: Date.now(), data };
@@ -182,18 +136,14 @@ function cacheData(key, data) {
   }
 }
 
-/**
- * Retrieves data from localStorage. Returns null if missing or expired.
- * @param {string} key - Storage key
- * @returns {*|null}
- */
-function getCachedData(key) {
+// When offline, ignore expiry and return whatever is cached
+function getCachedData(key, ignoreExpiry = false) {
   try {
     const raw = localStorage.getItem(`afribiz_${key}`);
     if (!raw) return null;
     const payload = JSON.parse(raw);
     if (!payload || typeof payload.timestamp !== 'number') return null;
-    if (Date.now() - payload.timestamp > CONFIG.CACHE_DURATION_MS) {
+    if (!ignoreExpiry && Date.now() - payload.timestamp > CONFIG.CACHE_DURATION_MS) {
       localStorage.removeItem(`afribiz_${key}`);
       return null;
     }
@@ -203,20 +153,10 @@ function getCachedData(key) {
   }
 }
 
-/**
- * Returns true if a cached entry exists and is still fresh.
- * @param {string} key - Storage key
- * @returns {boolean}
- */
 function isCacheValid(key) {
   return getCachedData(key) !== null;
 }
 
-/**
- * Returns the timestamp from a cached entry or null.
- * @param {string} key - Storage key
- * @returns {Date|null}
- */
 function getCacheDate(key) {
   try {
     const raw = localStorage.getItem(`afribiz_${key}`);
@@ -228,17 +168,7 @@ function getCacheDate(key) {
   }
 }
 
-/* ============================================================
-   SECTION: UTILITY FUNCTIONS
-   Small pure helpers with no side-effects.
-   ============================================================ */
-
-/**
- * Debounces a function call.
- * @param {Function} fn    - Function to debounce
- * @param {number}   wait  - Milliseconds to wait
- * @returns {Function}
- */
+// --- UTILITIES ---
 function debounce(fn, wait) {
   let timer;
   return function (...args) {
@@ -247,12 +177,6 @@ function debounce(fn, wait) {
   };
 }
 
-/**
- * Sanitises a user-provided string for safe text display.
- * Strips dangerous characters — never passes to innerHTML.
- * @param {string} str - Raw input
- * @returns {string}
- */
 function sanitizeInput(str) {
   if (typeof str !== 'string') return '';
   return str
@@ -261,11 +185,6 @@ function sanitizeInput(str) {
     .slice(0, 200);
 }
 
-/**
- * Formats a large number with magnitude suffix.
- * @param {number} n - Number to format
- * @returns {string}
- */
 function formatNumber(n) {
   if (n === null || n === undefined || isNaN(n)) return 'N/A';
   const abs = Math.abs(n);
@@ -276,22 +195,12 @@ function formatNumber(n) {
   return n.toFixed(1);
 }
 
-/**
- * Formats a duration value as "N day(s)".
- * @param {number} n - Number of days
- * @returns {string}
- */
 function formatDays(n) {
   if (n === null || n === undefined || isNaN(n)) return 'N/A';
   const rounded = Math.round(n);
   return rounded === 1 ? '1 day' : `${rounded} days`;
 }
 
-/**
- * Returns the accent CSS color string based on score value.
- * @param {number|null} score - 0–100
- * @returns {string} CSS variable string
- */
 function getScoreColor(score) {
   if (score === null || score === undefined) return 'var(--text-3)';
   if (score >= 60) return 'var(--green)';
@@ -299,11 +208,6 @@ function getScoreColor(score) {
   return 'var(--red)';
 }
 
-/**
- * Returns a CSS class suffix based on score.
- * @param {number|null} score
- * @returns {'high'|'mid'|'low'|'na'}
- */
 function getScoreBand(score) {
   if (score === null || score === undefined) return 'na';
   if (score >= 60) return 'high';
@@ -311,12 +215,6 @@ function getScoreBand(score) {
   return 'low';
 }
 
-/**
- * Calculates trend direction from an array of numbers.
- * Compares first half mean to second half mean.
- * @param {number[]} values - Array of values newest-first
- * @returns {'up'|'down'|'stable'}
- */
 function getTrendArrow(values) {
   const valid = values.filter(v => v !== null && !isNaN(v));
   if (valid.length < 2) return 'stable';
@@ -331,36 +229,18 @@ function getTrendArrow(values) {
   return 'stable';
 }
 
-/**
- * Returns an emoji arrow for a trend direction.
- * @param {'up'|'down'|'stable'} trend
- * @returns {string}
- */
 function trendEmoji(trend) {
   if (trend === 'up')   return '↑';
   if (trend === 'down') return '↓';
   return '→';
 }
 
-/**
- * Returns a color class for a trend direction.
- * @param {'up'|'down'|'stable'} trend
- * @returns {string}
- */
 function trendClass(trend) {
   if (trend === 'up')   return 'style="color:var(--green)"';
   if (trend === 'down') return 'style="color:var(--red)"';
   return 'style="color:var(--text-3)"';
 }
 
-/**
- * Creates a DOM element with optional attributes and children.
- * Safe alternative to innerHTML.
- * @param {string} tag        - HTML tag name
- * @param {Object} [attrs={}] - Key-value attributes
- * @param {Array}  [children] - Child nodes or strings
- * @returns {HTMLElement}
- */
 function el(tag, attrs = {}, children = []) {
   const node = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) {
@@ -375,15 +255,7 @@ function el(tag, attrs = {}, children = []) {
   return node;
 }
 
-/* ============================================================
-   SECTION: TOAST NOTIFICATIONS
-   ============================================================ */
-
-/**
- * Shows a temporary toast notification.
- * @param {string} message  - Message to display
- * @param {'info'|'success'|'warning'|'error'} [type='info'] - Toast style
- */
+// --- TOASTS ---
 function showToast(message, type = 'info') {
   const container = document.getElementById('toastContainer');
   if (!container) return;
@@ -399,11 +271,7 @@ function showToast(message, type = 'info') {
   }, CONFIG.TOAST_DURATION_MS);
 }
 
-/* ============================================================
-   SECTION: LOADING SKELETONS
-   ============================================================ */
-
-/** Shows skeleton placeholder cards in the grid. */
+// --- LOADING ---
 function showLoadingSkeleton() {
   const grid = document.getElementById('cardsGrid');
   if (!grid) return;
@@ -416,21 +284,12 @@ function showLoadingSkeleton() {
   }
 }
 
-/** Clears skeleton loaders (grid will be re-populated by renderCountryCards). */
 function hideLoadingSkeleton() {
   const grid = document.getElementById('cardsGrid');
   if (grid) grid.innerHTML = '';
 }
 
-/* ============================================================
-   SECTION: ERROR DISPLAY
-   ============================================================ */
-
-/**
- * Shows a full error card with message and suggestion.
- * @param {string} title      - Error heading
- * @param {string} suggestion - Actionable suggestion for the user
- */
+// --- ERROR DISPLAY ---
 function showError(title, suggestion) {
   const card = document.getElementById('errorCard');
   const titleEl = document.getElementById('errorTitle');
@@ -442,23 +301,12 @@ function showError(title, suggestion) {
   hideLoadingSkeleton();
 }
 
-/** Hides the error card. */
 function hideError() {
   const card = document.getElementById('errorCard');
   if (card) card.hidden = true;
 }
 
-/* ============================================================
-   SECTION: API MODULE
-   All external data fetching. No business logic here.
-   ============================================================ */
-
-/**
- * Wraps fetch with a timeout, returning null on failure.
- * @param {string} url       - URL to fetch
- * @param {number} [timeoutMs] - Timeout in ms
- * @returns {Promise<Response|null>}
- */
+// --- API ---
 async function fetchWithTimeout(url, timeoutMs = CONFIG.REQUEST_TIMEOUT_MS) {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeoutMs);
@@ -472,11 +320,6 @@ async function fetchWithTimeout(url, timeoutMs = CONFIG.REQUEST_TIMEOUT_MS) {
   }
 }
 
-/**
- * Fetches country metadata for all African nations from REST Countries API.
- * Returns an array of simplified country objects.
- * @returns {Promise<Object[]>}
- */
 async function fetchRestCountries() {
   const cacheKey = 'rest_countries_africa';
   const cached = getCachedData(cacheKey);
@@ -508,13 +351,6 @@ async function fetchRestCountries() {
   }
 }
 
-/**
- * Fetches the most recent value for a single World Bank indicator for one country.
- * Returns { value, year } or null if unavailable.
- * @param {string} countryCode    - ISO alpha-2 country code
- * @param {string} indicatorCode  - World Bank indicator code
- * @returns {Promise<{value:number,year:string}|null>}
- */
 async function fetchIndicatorData(countryCode, indicatorCode) {
   const url = `${CONFIG.WORLD_BANK_BASE}/country/${countryCode}/indicator/${indicatorCode}?format=json&mrv=1&per_page=1`;
   const response = await fetchWithTimeout(url);
@@ -533,12 +369,6 @@ async function fetchIndicatorData(countryCode, indicatorCode) {
   }
 }
 
-/**
- * Fetches all key indicators for a single country in parallel.
- * Returns an object keyed by indicator name with { value, year } pairs.
- * @param {string} countryCode - ISO alpha-2 country code
- * @returns {Promise<Object>}
- */
 async function fetchAllIndicators(countryCode) {
   const cacheKey = `indicators_${countryCode}`;
   const cached = getCachedData(cacheKey);
@@ -563,12 +393,6 @@ async function fetchAllIndicators(countryCode) {
   return data;
 }
 
-/**
- * Fetches historical ease-of-business score data for trend chart.
- * Returns an array of { year, value } sorted ascending, or [].
- * @param {string} countryCode - ISO alpha-2 country code
- * @returns {Promise<Array<{year:string, value:number}>>}
- */
 async function fetchHistoricalData(countryCode) {
   const cacheKey = `history_${countryCode}`;
   const cached = getCachedData(cacheKey);
@@ -592,180 +416,8 @@ async function fetchHistoricalData(countryCode) {
   }
 }
 
-/* ============================================================
-   SECTION: GNEWS API — Business headlines per country
-   Free tier: 100 req/day — https://gnews.io
-   Gracefully skipped when GNEWS_API_KEY is empty.
-   ============================================================ */
 
-/**
- * Fetches up to 3 recent news articles about business/economy
- * in a given country. Returns [] if no key set or request fails.
- * @param {string} countryName - Full country name e.g. "Rwanda"
- * @returns {Promise<Array<{title,description,url,source,publishedAt}>>}
- */
-async function fetchCountryNews(countryName) {
-  if (!CONFIG.GNEWS_API_KEY) return [];
-
-  const cacheKey = `news_${countryName.replace(/\s+/g, '_').toLowerCase()}`;
-  const cached   = getCachedData(cacheKey);
-  if (cached && (Date.now() - cached.timestamp < CONFIG.NEWS_CACHE_MS)) {
-    return cached.data;
-  }
-
-  const query = encodeURIComponent(`${countryName} economy`);
-  const url   = `${CONFIG.GNEWS_BASE}/search?q=${query}&lang=en&max=${CONFIG.NEWS_ARTICLE_COUNT}&apikey=${CONFIG.GNEWS_API_KEY}`;
-
-  const response = await fetchWithTimeout(url);
-  if (!response || !response.ok) return [];
-
-  try {
-    const json = await response.json();
-    if (!json.articles || !json.articles.length) return [];
-    const articles = json.articles.map(a => ({
-      title:       a.title       || '',
-      description: a.description || '',
-      url:         a.url         || '#',
-      source:      a.source?.name || 'News',
-      publishedAt: a.publishedAt  || '',
-    }));
-    cacheData(cacheKey, articles);
-    return articles;
-  } catch (_) {
-    return [];
-  }
-}
-
-/* ============================================================
-   SECTION: EXCHANGERATE API — Live currency conversion
-   Free tier: 1,500 req/month — https://app.exchangerate-api.com
-   Gracefully skipped when EXCHANGE_RATE_KEY is empty.
-   ============================================================ */
-
-/**
- * Fetches live exchange rates for a given base currency (USD by default).
- * Returns a rates object or null if no key set or request fails.
- * @param {string} base - Base currency code e.g. "USD"
- * @returns {Promise<Object|null>} e.g. { EUR: 0.91, KES: 129.4, ... }
- */
-async function fetchExchangeRates(base = 'USD') {
-  if (!CONFIG.EXCHANGE_RATE_KEY) return null;
-
-  const cacheKey = `fx_${base}`;
-  const cached   = getCachedData(cacheKey);
-  if (cached && (Date.now() - cached.timestamp < CONFIG.NEWS_CACHE_MS)) {
-    return cached.data;
-  }
-
-  const url = `${CONFIG.EXCHANGE_RATE_BASE}/${CONFIG.EXCHANGE_RATE_KEY}/latest/${base}`;
-  const response = await fetchWithTimeout(url);
-  if (!response || !response.ok) return null;
-
-  try {
-    const json = await response.json();
-    if (json.result !== 'success' || !json.conversion_rates) return null;
-    cacheData(cacheKey, json.conversion_rates);
-    return json.conversion_rates;
-  } catch (_) {
-    return null;
-  }
-}
-
-/**
- * Renders the live exchange rate for a country's primary currency
- * into a given container element. Shows nothing if no key is set.
- * @param {Object}      country   - Country data object
- * @param {HTMLElement} container - Element to inject the rate pill into
- */
-async function renderExchangeRate(country, container) {
-  if (!CONFIG.EXCHANGE_RATE_KEY || !container) return;
-
-  // Extract currency code from stored string like "KSh, $" or "RWF"
-  const rawCurrency = country.currencies || '';
-  const rates = await fetchExchangeRates('USD');
-  if (!rates) return;
-
-  // Try to match a known 3-letter currency code
-  // REST Countries stores symbols; we do a best-effort lookup via country code
-  const COUNTRY_CURRENCY_MAP = {
-    RW:'RWF', KE:'KES', TZ:'TZS', UG:'UGX', NG:'NGN', GH:'GHS',
-    ZA:'ZAR', EG:'EGP', ET:'ETB', MA:'MAD', TN:'TND', SN:'XOF',
-    CI:"XOF", CM:'XAF', MZ:'MZN', MG:'MGA', AO:'AOA', ZM:'ZMW',
-    ZW:'ZWL', SD:'SDG', MU:'MUR', BW:'BWP', NA:'NAD', MR:'MRO',
-    ML:'XOF', BJ:'XOF', TG:'XOF', NE:'XOF', BF:'XOF', GN:'GNF',
-    SL:'SLL', LR:'LRD', GM:'GMD', GW:'XOF', CV:'CVE', ST:'STN',
-    SS:'SSP', ER:'ERN', DJ:'DJF', SO:'SOS', KM:'KMF', SC:'SCR',
-    BI:'BIF', RW:'RWF', MW:'MWK', LS:'LSL', SZ:'SZL', CD:'CDF',
-    CG:'XAF', GA:'XAF', GQ:'XAF', CF:'XAF', TD:'XAF', LY:'LYD',
-    DZ:'DZD', MR:'MRU', TN:'TND',
-  };
-
-  const code = COUNTRY_CURRENCY_MAP[country.code];
-  if (!code || !rates[code]) return;
-
-  const rate    = rates[code];
-  const display = rate < 1 ? (1 / rate).toFixed(4) + ' USD = 1 ' + code
-                            : '1 USD = ' + rate.toFixed(2) + ' ' + code;
-
-  const pill = el('span', { className: 'fx-pill', textContent: '💱 ' + display });
-  pill.title = 'Live exchange rate via ExchangeRate-API';
-  container.appendChild(pill);
-}
-
-/**
- * Renders recent news headlines into a given container element.
- * Skipped entirely when GNEWS_API_KEY is empty.
- * @param {string}      countryName - Country name for search query
- * @param {HTMLElement} container   - Element to inject news into
- */
-async function renderNewsSection(countryName, container) {
-  if (!CONFIG.GNEWS_API_KEY || !container) return;
-
-  const articles = await fetchCountryNews(countryName);
-
-  const section = el('div', { className: 'profile-section news-section' });
-  const title   = el('div', { className: 'profile-section-title', textContent: 'Recent Business News' });
-
-  if (!articles.length) {
-    const empty = el('p', { className: 'news-empty', textContent: 'No recent news found.' });
-    empty.style.color = 'var(--text-3)';
-    empty.style.fontSize = '0.875rem';
-    section.append(title, empty);
-    container.appendChild(section);
-    return;
-  }
-  const list    = el('div', { className: 'news-list' });
-
-  articles.forEach(article => {
-    const item    = el('a', { className: 'news-item', href: article.url, target: '_blank', rel: 'noopener noreferrer' });
-    const meta    = el('div', { className: 'news-meta' });
-    const source  = el('span', { className: 'news-source', textContent: article.source });
-    const date    = el('span', { className: 'news-date', textContent: article.publishedAt ? new Date(article.publishedAt).toLocaleDateString() : '' });
-    meta.append(source, date);
-
-    const headline = el('div', { className: 'news-headline', textContent: article.title });
-    const desc     = el('div', { className: 'news-desc', textContent: article.description });
-
-    item.append(meta, headline, desc);
-    list.appendChild(item);
-  });
-
-  section.append(title, list);
-  container.appendChild(section);
-}
-
-/* ============================================================
-   SECTION: SCORE MODULE
-   Normalises raw indicator values and calculates composite score.
-   ============================================================ */
-
-/**
- * Normalises a set of raw values to 0–100 range, respecting inversion.
- * @param {number[]} values   - Array of all raw values (for min/max calculation)
- * @param {number}   raw      - The single value to normalise
- * @param {boolean}  inverted - Whether lower raw = better
- * @returns {number} 0–100
- */
+// --- SCORING ---
 function normaliseValue(values, raw, inverted) {
   const valid = values.filter(v => v !== null && !isNaN(v));
   if (!valid.length) return 50;
@@ -776,13 +428,6 @@ function normaliseValue(values, raw, inverted) {
   return inverted ? 100 - normalised : normalised;
 }
 
-/**
- * Calculates a composite business environment score (0–100) for a country.
- * Returns null if insufficient indicator data is available.
- * @param {Object}   countryData          - Country data object
- * @param {Object[]} allCountriesData     - All countries' data for normalisation context
- * @returns {number|null}
- */
 function calculateBusinessScore(countryData, allCountriesData) {
   const weightedIndicators = Object.entries(INDICATORS).filter(([, ind]) => ind.weight > 0);
   let totalWeight = 0;
@@ -810,11 +455,6 @@ function calculateBusinessScore(countryData, allCountriesData) {
   return Math.round((weightedSum / totalWeight) * 10) / 10;
 }
 
-/**
- * Assigns African and global ranking positions to all countries.
- * Modifies country objects in place; handles null scores gracefully.
- * @param {Object[]} countries - Array of country objects
- */
 function rankCountries(countries) {
   const withScore = countries.filter(c => c.score !== null).sort((a, b) => b.score - a.score);
   const noScore   = countries.filter(c => c.score === null);
@@ -831,15 +471,7 @@ function rankCountries(countries) {
   });
 }
 
-/* ============================================================
-   SECTION: FILTER MODULE
-   Applies search, region, sort to STATE.countries → STATE.filtered
-   ============================================================ */
-
-/**
- * Applies all active filters and sorts to STATE.countries.
- * Writes result into STATE.filtered and resets to page 1.
- */
+// --- FILTERS ---
 function applyFilters() {
   const { region, sortBy, sortOrder, search } = STATE.filters;
   const safeSearch = sanitizeInput(search).toLowerCase();
@@ -883,16 +515,7 @@ function applyFilters() {
   STATE.currentPage = 1;
 }
 
-/* ============================================================
-   SECTION: INSIGHTS MODULE
-   Generates data-driven insight strings from real fetched data.
-   ============================================================ */
-
-/**
- * Generates an array of dynamic, data-driven insight strings.
- * @param {Object[]} countries - Ranked country objects
- * @returns {string[]}
- */
+// --- INSIGHTS ---
 function generateInsights(countries) {
   const insights = [];
   const withScore = countries.filter(c => c.score !== null);
@@ -957,14 +580,7 @@ function generateInsights(countries) {
   return insights.length ? insights : ['Explore 54 African nations by business environment score'];
 }
 
-/* ============================================================
-   SECTION: RENDER MODULE — Dashboard Cards
-   ============================================================ */
-
-/**
- * Renders all country cards for the current page.
- * Clears the grid first, then builds featured (top 3) and regular cards.
- */
+// --- CARDS ---
 function renderCountryCards() {
   const grid       = document.getElementById('cardsGrid');
   const emptyState = document.getElementById('emptyState');
@@ -1001,17 +617,6 @@ function renderCountryCards() {
   renderPagination();
 }
 
-/**
- * Builds a larger featured card (used for top 3 ranked countries).
- * @param {Object} country - Country data object
- * @returns {HTMLElement}
- */
-/**
- * Builds a single unified country card (all cards look the same).
- * Shows flag, name, score, registration days, tax rate, and a score bar.
- * @param {Object} country - Country data object
- * @returns {HTMLElement}
- */
 function buildCountryCard(country) {
   const band   = getScoreBand(country.score);
   const inComp = STATE.selected.includes(country.code);
@@ -1107,11 +712,6 @@ function buildCountryCard(country) {
 function buildFeaturedCard(c) { return buildCountryCard(c); }
 function buildRegularCard(c)  { return buildCountryCard(c); }
 
-/**
- * Returns the single most notable strength label for a country.
- * @param {Object} country
- * @returns {string}
- */
 function getTopStrength(country) {
   const i = country.indicators;
   if (i.gdpPerCapita?.value      != null && i.gdpPerCapita.value      > 5000) return '💰 High GDP/Cap';
@@ -1122,14 +722,7 @@ function getTopStrength(country) {
   return '📊 Explore Data';
 }
 
-/* ============================================================
-   RENDER MODULE — Stats Bar
-   ============================================================ */
-
-/**
- * Updates the four aggregate stats in the stats bar.
- * Reacts to currently filtered country set.
- */
+// --- STATS BAR ---
 function renderStatsBar() {
   const countries = STATE.filtered.length ? STATE.filtered : STATE.countries;
 
@@ -1184,11 +777,7 @@ function renderStatsBar() {
   }
 }
 
-/* ============================================================
-   RENDER MODULE — Mini Leaderboard
-   ============================================================ */
-
-/** Renders the top-5 countries in the sidebar leaderboard. */
+// --- LEADERBOARD ---
 function renderMiniLeaderboard() {
   const list = document.getElementById('miniLeaderboard');
   if (!list) return;
@@ -1226,11 +815,6 @@ function renderMiniLeaderboard() {
   });
 }
 
-/* ============================================================
-   RENDER MODULE — Results Counter
-   ============================================================ */
-
-/** Updates the "N countries match" counter in the sidebar. */
 function renderResultsCounter() {
   const counter = document.getElementById('resultsCounter');
   if (!counter) return;
@@ -1240,11 +824,7 @@ function renderResultsCounter() {
   counter.appendChild(document.createTextNode(' countries'));
 }
 
-/* ============================================================
-   RENDER MODULE — Pagination
-   ============================================================ */
-
-/** Renders pagination buttons below the card grid. */
+// --- PAGINATION ---
 function renderPagination() {
   const nav = document.getElementById('pagination');
   if (!nav) return;
@@ -1323,12 +903,6 @@ function renderPagination() {
   nav.appendChild(next);
 }
 
-/**
- * Generates a sensible page number array for pagination.
- * @param {number} current - Current page
- * @param {number} total   - Total pages
- * @returns {Array<number|'…'>}
- */
 function getPaginationRange(current, total) {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
   const range = [1];
@@ -1341,13 +915,7 @@ function getPaginationRange(current, total) {
   return range;
 }
 
-/* ============================================================
-   RENDER MODULE — Dashboard (master render function)
-   ============================================================ */
-
-/**
- * Renders the complete dashboard view with all sub-sections.
- */
+// --- DASHBOARD ---
 function renderDashboard() {
   applyFilters();
   renderStatsBar();
@@ -1356,14 +924,7 @@ function renderDashboard() {
   renderMiniLeaderboard();
 }
 
-/* ============================================================
-   RENDER MODULE — Country Profile
-   ============================================================ */
-
-/**
- * Navigates to and renders the full country profile view.
- * @param {string} countryCode - ISO alpha-2 code
- */
+// --- PROFILE ---
 async function navigateToProfile(countryCode) {
   const country = STATE.countries.find(c => c.code === countryCode);
   if (!country) {
@@ -1376,11 +937,7 @@ async function navigateToProfile(countryCode) {
   switchView('profile');
   renderCountryProfile(country);
 
-  // Fetch news and historical chart in parallel
-  const [history] = await Promise.all([
-    fetchHistoricalData(countryCode),
-    renderNewsSection(country.name, document.getElementById('profileContent')),
-  ]);
+  const history = await fetchHistoricalData(countryCode);
 
   // Store historical scores so trend arrows work in the indicators list
   if (history.length) {
@@ -1396,15 +953,7 @@ async function navigateToProfile(countryCode) {
   }
 }
 
-/**
- * Renders the static parts of a country profile (hero, indicators, etc.).
- * @param {Object} country - Country data object
- */
-/**
- * Builds the static HTML scaffold for the country profile view
- * and injects it into #profileContent. All placeholder IDs used by
- * renderCountryProfile and its helpers are created here.
- */
+// Builds the HTML structure for the profile view; all IDs must exist before renderCountryProfile fills them in
 function buildProfileShell() {
   const container = document.getElementById('profileContent');
   if (!container) return;
@@ -1580,10 +1129,6 @@ function renderCountryProfile(country) {
   renderSimilarCountries(country.code);
 }
 
-/**
- * Renders the 10-indicator breakdown rows for a country.
- * @param {Object} country - Country data object
- */
 function renderIndicatorsList(country) {
   const list = document.getElementById('indicatorsList');
   if (!list) return;
@@ -1674,10 +1219,6 @@ function renderIndicatorsList(country) {
   }
 }
 
-/**
- * Renders the horizontal business setup timeline.
- * @param {Object} country - Country data object
- */
 function renderSetupTimeline(country) {
   const container = document.getElementById('setupTimeline');
   if (!container) return;
@@ -1701,11 +1242,6 @@ function renderSetupTimeline(country) {
   });
 }
 
-/**
- * Generates and renders dynamic strengths and weaknesses.
- * Minimum 8 conditions evaluated against real data thresholds.
- * @param {Object} country - Country data object
- */
 function renderProsCons(country) {
   const container = document.getElementById('prosCons');
   if (!container) return;
@@ -1731,12 +1267,6 @@ function renderProsCons(country) {
   }
 }
 
-/**
- * Generates pros/cons from real indicator data against defined thresholds.
- * Returns array of { emoji, text, positive } objects.
- * @param {Object} country - Country data object
- * @returns {Array<{emoji:string, text:string, positive:boolean}>}
- */
 function generateProsCons(country) {
   const ind = country.indicators;
   const items = [];
@@ -1795,10 +1325,6 @@ function generateProsCons(country) {
   return items;
 }
 
-/**
- * Finds and renders 3 similar countries (close score, nearby region).
- * @param {string} countryCode - Reference country ISO code
- */
 function renderSimilarCountries(countryCode) {
   const container = document.getElementById('similarCountries');
   if (!container) return;
@@ -1826,11 +1352,6 @@ function renderSimilarCountries(countryCode) {
   }
 }
 
-/**
- * Returns 3 similar countries based on score proximity and region.
- * @param {string} countryCode - Reference country ISO code
- * @returns {Object[]}
- */
 function generateSimilarCountries(countryCode) {
   const ref = STATE.countries.find(c => c.code === countryCode);
   if (!ref) return [];
@@ -1846,16 +1367,7 @@ function generateSimilarCountries(countryCode) {
     .slice(0, 3);
 }
 
-/* ============================================================
-   SECTION: CHART MODULE
-   All Chart.js chart instantiation. Destroys old instances first.
-   ============================================================ */
-
-/**
- * Renders the trend line chart for a country's historical ease-of-business score.
- * @param {string} countryCode - ISO code (used for title)
- * @param {Array<{year:string, value:number}>} data - Historical data
- */
+// --- CHARTS ---
 function renderTrendChart(countryCode, data) {
   const canvas = document.getElementById('trendChart');
   if (!canvas) return;
@@ -1929,10 +1441,6 @@ function renderTrendChart(countryCode, data) {
   });
 }
 
-/**
- * Renders a radar chart comparing selected countries across indicators.
- * @param {Object[]} countries - Country data objects to compare
- */
 function renderRadarChart(countries) {
   const canvas = document.getElementById('radarChart');
   if (!canvas) return;
@@ -2021,11 +1529,7 @@ function renderRadarChart(countries) {
   });
 }
 
-/* ============================================================
-   RENDER MODULE — Comparison View
-   ============================================================ */
-
-/** Renders the full comparison view for selected countries. */
+// --- COMPARISON ---
 function renderComparisonView() {
   const container = document.getElementById('comparisonContent');
   if (!container) return;
@@ -2083,11 +1587,6 @@ function renderComparisonView() {
   container.appendChild(buildComparisonTable(countries));
 }
 
-/**
- * Determines winner badges for each column in the comparison.
- * @param {Object[]} countries
- * @returns {Object} Map of column index → string[]
- */
 function computeWinners(countries) {
   const categories = [
     { label: 'Best Score',    extract: c => c.score, bestIsHigh: true },
@@ -2111,11 +1610,6 @@ function computeWinners(countries) {
   return result;
 }
 
-/**
- * Builds the detailed comparison table element.
- * @param {Object[]} countries
- * @returns {HTMLElement}
- */
 function buildComparisonTable(countries) {
   const indicators = Object.entries(INDICATORS).filter(([k]) =>
     ['gdpPerCapita','inflation','unemployment','internetAccess','electricityAccess','taxRevenue','corruption','gdp'].includes(k)
@@ -2170,14 +1664,7 @@ function buildComparisonTable(countries) {
   return table;
 }
 
-/* ============================================================
-   RENDER MODULE — Rankings Table
-   ============================================================ */
-
-/**
- * Builds the static HTML scaffold for the rankings view (table + headers)
- * and injects it into #rankingsContent. Called once before populating rows.
- */
+// --- RANKINGS ---
 function buildRankingsShell() {
   const wrapper = document.getElementById('rankingsContent');
   if (!wrapper) return;
@@ -2216,12 +1703,25 @@ function buildRankingsShell() {
   wrapper.appendChild(table);
 }
 
-/** Renders the full sortable rankings table with all 54 countries. */
 function renderRankingsTable() {
   buildRankingsShell();
   const tbody = document.getElementById('rankingsBody');
   const table = document.getElementById('rankingsTable');
   if (!tbody || !table) return;
+
+  // Attach sort listener now that the table exists
+  table.addEventListener('click', e => {
+    const th = e.target.closest('th.sortable');
+    if (!th) return;
+    const col = th.dataset.col;
+    if (STATE.tableSort.col === col) {
+      STATE.tableSort.order = STATE.tableSort.order === 'asc' ? 'desc' : 'asc';
+    } else {
+      STATE.tableSort.col = col;
+      STATE.tableSort.order = 'asc';
+    }
+    renderRankingsTable();
+  });
 
   const search = sanitizeInput(
     (document.getElementById('rankingsSearch')?.value || '').toLowerCase()
@@ -2278,12 +1778,6 @@ function renderRankingsTable() {
   updateTableSortHeaders();
 }
 
-/**
- * Returns the numeric value for a given sort column from a country object.
- * @param {Object} country - Country data object
- * @param {string} col     - Column key
- * @returns {number|null}
- */
 function getTableSortValue(country, col) {
   switch (col) {
     case 'rank':  return country.africanRank ?? 9999;
@@ -2298,7 +1792,6 @@ function getTableSortValue(country, col) {
   }
 }
 
-/** Updates sort arrow indicators on table headers. */
 function updateTableSortHeaders() {
   const table = document.getElementById('rankingsTable');
   if (!table) return;
@@ -2317,14 +1810,7 @@ function updateTableSortHeaders() {
   });
 }
 
-/* ============================================================
-   SECTION: CSV EXPORT
-   ============================================================ */
-
-/**
- * Exports the current rankings data to a CSV file download.
- * Gracefully shows a toast if the download fails.
- */
+// --- CSV EXPORT ---
 function exportToCSV() {
   try {
     const headers = ['Rank','Country','Code','Score','GDP per Capita USD','Inflation %','Unemployment %','Internet Access %','Electricity Access %','GDP USD','Region'];
@@ -2359,14 +1845,7 @@ function exportToCSV() {
   }
 }
 
-/* ============================================================
-   SECTION: COMPARE MODE
-   ============================================================ */
-
-/**
- * Handles clicking a country card in compare mode.
- * @param {string} countryCode - ISO alpha-2 code
- */
+// --- COMPARE MODE ---
 function handleCardClick(countryCode) {
   if (STATE.compareMode) {
     if (STATE.selected.includes(countryCode)) {
@@ -2381,10 +1860,6 @@ function handleCardClick(countryCode) {
   }
 }
 
-/**
- * Adds a country to the comparison selection.
- * @param {string} countryCode - ISO alpha-2 code
- */
 function addToComparison(countryCode) {
   if (STATE.selected.includes(countryCode)) return;
   STATE.selected.push(countryCode);
@@ -2392,17 +1867,12 @@ function addToComparison(countryCode) {
   updateCardCompareHighlight(countryCode, true);
 }
 
-/**
- * Removes a country from the comparison selection.
- * @param {string} countryCode - ISO alpha-2 code
- */
 function removeFromComparison(countryCode) {
   STATE.selected = STATE.selected.filter(c => c !== countryCode);
   updateCompareUI();
   updateCardCompareHighlight(countryCode, false);
 }
 
-/** Updates the sidebar comparison chips and button state. */
 function updateCompareUI() {
   const chips = document.getElementById('compareChips');
   const btn = document.getElementById('compareBtn');
@@ -2421,14 +1891,12 @@ function updateCompareUI() {
     chips.appendChild(chip);
   });
 
+  const hasAny = STATE.selected.length > 0;
+  chips.hidden = !hasAny;
+  btn.hidden = !hasAny;
   btn.disabled = STATE.selected.length < CONFIG.COMPARISON_MIN;
 }
 
-/**
- * Updates a card's visual highlight state in comparison mode.
- * @param {string}  countryCode - ISO alpha-2 code
- * @param {boolean} active      - Whether the card is selected
- */
 function updateCardCompareHighlight(countryCode, active) {
   const card = document.querySelector(`[data-code="${countryCode}"]`);
   if (card) {
@@ -2436,14 +1904,7 @@ function updateCardCompareHighlight(countryCode, active) {
   }
 }
 
-/* ============================================================
-   SECTION: VIEW MANAGEMENT
-   ============================================================ */
-
-/**
- * Switches the visible main content view.
- * @param {'dashboard'|'profile'|'comparison'|'rankings'} view
- */
+// --- VIEW MANAGEMENT ---
 function switchView(view) {
   const views = {
     dashboard:  document.getElementById('viewDashboard'),
@@ -2460,14 +1921,7 @@ function switchView(view) {
   window.scrollTo({ top: 0 });
 }
 
-/* ============================================================
-   SECTION: INSIGHTS TICKER
-   ============================================================ */
-
-/**
- * Starts the auto-rotating insights ticker.
- * @param {string[]} insights - Array of insight strings
- */
+// --- TICKER ---
 function rotateInsights(insights) {
   const tickerText = document.getElementById('tickerText');
   if (!tickerText || !insights.length) return;
@@ -2489,15 +1943,7 @@ function rotateInsights(insights) {
   setInterval(rotate, CONFIG.TICKER_INTERVAL_MS);
 }
 
-/* ============================================================
-   SECTION: STATUS INDICATOR
-   ============================================================ */
-
-/**
- * Updates the header status indicator dot and text.
- * @param {'loading'|'live'|'cached'|'error'|'offline'} status
- * @param {string} [text] - Optional label override
- */
+// --- STATUS ---
 function setStatus(status, text) {
   const dot  = document.getElementById('statusDot');
   const label = document.getElementById('statusText');
@@ -2516,12 +1962,7 @@ function setStatus(status, text) {
   label.textContent = text || statusMessages[status] || '';
 }
 
-/* ============================================================
-   SECTION: EVENT MODULE
-   All event listeners registered in one place.
-   ============================================================ */
-
-/** Attaches all DOM event listeners. Uses event delegation where appropriate. */
+// --- EVENTS ---
 function initEventListeners() {
   // Region filter
   document.getElementById('regionButtons')?.addEventListener('click', e => {
@@ -2643,19 +2084,7 @@ function initEventListeners() {
     switchView('dashboard');
   });
 
-  // Rankings table sort
-  document.getElementById('rankingsTable')?.addEventListener('click', e => {
-    const th = e.target.closest('th.sortable');
-    if (!th) return;
-    const col = th.dataset.col;
-    if (STATE.tableSort.col === col) {
-      STATE.tableSort.order = STATE.tableSort.order === 'asc' ? 'desc' : 'asc';
-    } else {
-      STATE.tableSort.col = col;
-      STATE.tableSort.order = 'asc';
-    }
-    renderRankingsTable();
-  });
+  // Rankings table sort — attached in renderRankingsTable() after the table is built
 
   // Rankings search
   const rankSearch = document.getElementById('rankingsSearch');
@@ -2723,11 +2152,6 @@ function initEventListeners() {
   });
 }
 
-/* ============================================================
-   UTILITY — Reset all filters to defaults
-   ============================================================ */
-
-/** Resets all filters and search to their default state, re-renders dashboard. */
 function resetAllFilters() {
   STATE.filters = { region: 'all', sortBy: 'score', sortOrder: 'desc', search: '' };
   STATE.currentPage = 1;
@@ -2745,19 +2169,11 @@ function resetAllFilters() {
   renderDashboard();
 }
 
-/* ============================================================
-   SECTION: INIT — Application Bootstrap
-   ============================================================ */
-
-/**
- * Main bootstrap function. Fetches data, builds state, renders UI.
- * Checks cache first, falls back to live fetch, handles all error scenarios.
- */
+// --- INIT ---
 async function init() {
   setStatus('loading');
   showLoadingSkeleton();
 
-  // Clear stale cache if indicator schema changed
   try {
     const storedVersion = localStorage.getItem('afribiz_cache_version');
     if (storedVersion !== CACHE_VERSION) {
@@ -2766,20 +2182,27 @@ async function init() {
         .forEach(k => localStorage.removeItem(k));
       localStorage.setItem('afribiz_cache_version', CACHE_VERSION);
     }
-  } catch (_) { /* localStorage unavailable */ }
+  } catch (_) { }
 
   let countries = [];
 
-  // Try cached data first
-  const cachedCountries = getCachedData('countries_all');
-  if (cachedCountries) {
-    countries = cachedCountries.data;
-    setStatus('cached');
-  }
+  if (!navigator.onLine) {
+    // Offline — use any cached data regardless of age
+    const cachedCountries = getCachedData('countries_all', true);
+    if (cachedCountries) {
+      countries = cachedCountries.data;
+      rankCountries(countries);
+      setStatus('offline');
 
-  if (!countries.length) {
-    // Offline with no cache
-    if (!navigator.onLine) {
+      const offlineBanner = document.getElementById('offlineBanner');
+      if (offlineBanner) {
+        const cacheDate = getCacheDate('countries_all');
+        const dateStr = cacheDate ? cacheDate.toLocaleDateString() : 'an earlier session';
+        const dateEl = document.getElementById('offlineDate');
+        if (dateEl) dateEl.textContent = dateStr;
+        offlineBanner.hidden = false;
+      }
+    } else {
       showError(
         'No cached data available',
         'Connect to the internet to load business data for Africa.'
@@ -2787,117 +2210,102 @@ async function init() {
       setStatus('error');
       return;
     }
-
-    // Fetch REST Countries metadata
-    let restCountries = [];
-    try {
-      restCountries = await fetchRestCountries();
-    } catch (_) {
-      restCountries = [];
-    }
-
-    // Build initial country objects from our code list
-    const countryMeta = {};
-    for (const rc of restCountries) {
-      if (rc.cca2) countryMeta[rc.cca2.toUpperCase()] = rc;
-    }
-
-    const initialCountries = AFRICAN_COUNTRY_CODES.map(code => {
-      const meta = countryMeta[code] || {};
-      return {
-        code,
-        name: meta.name || code,
-        flag: meta.flag || '',
-        capital: meta.capital || 'N/A',
-        population: meta.population || null,
-        currencies: meta.currencies || 'N/A',
-        languages: meta.languages || 'N/A',
-        region: meta.region || 'Africa',
-        indicators: {},
-        score: null,
-        africanRank: null,
-        globalRank: null,
-        historicalScores: [],
-      };
-    });
-
-    // Fetch indicators in batches of 8 to avoid hammering the API
-    const BATCH_SIZE = 8;
-    let fetchFailed = false;
-
-    for (let i = 0; i < initialCountries.length; i += BATCH_SIZE) {
-      const batch = initialCountries.slice(i, i + BATCH_SIZE);
-      try {
-        await Promise.allSettled(
-          batch.map(async country => {
-            const indicators = await fetchAllIndicators(country.code);
-            country.indicators = indicators;
-          })
-        );
-      } catch (_) {
-        fetchFailed = true;
-        break;
-      }
-    }
-
-    if (fetchFailed && initialCountries.every(c => !Object.keys(c.indicators).length)) {
-      showError(
-        'Unable to load business data',
-        'The World Bank API may be unavailable. Check your connection and retry.'
-      );
-      setStatus('error');
-      return;
-    }
-
-    // Calculate scores with context of all countries
-    initialCountries.forEach(country => {
-      country.score = calculateBusinessScore(country, initialCountries);
-    });
-
-    rankCountries(initialCountries);
-    countries = initialCountries;
-    cacheData('countries_all', countries);
-    setStatus('live');
   } else {
-    // Recalculate scores from cache (they're stored, just re-rank to be safe)
-    rankCountries(countries);
-    setStatus('cached');
-    showToast('Showing cached data. Data refreshes every 4 hours.', 'info');
-
-    // Check if offline
-    if (!navigator.onLine) {
-      const offlineBanner = document.getElementById('offlineBanner');
-      if (offlineBanner) {
-        const cacheDate = getCacheDate('countries_all');
-        const dateStr = cacheDate ? cacheDate.toLocaleDateString() : 'earlier';
-        const dateEl = document.getElementById('offlineDate');
-        if (dateEl) dateEl.textContent = dateStr;
-        offlineBanner.hidden = false;
+    // Online - try to fetch fresh data
+    try {
+      let restCountries = [];
+      try {
+        restCountries = await fetchRestCountries();
+      } catch (_) {
+        restCountries = [];
       }
-      setStatus('offline');
+
+      const countryMeta = {};
+      for (const rc of restCountries) {
+        if (rc.cca2) countryMeta[rc.cca2.toUpperCase()] = rc;
+      }
+
+      const initialCountries = AFRICAN_COUNTRY_CODES.map(code => {
+        const meta = countryMeta[code] || {};
+        return {
+          code,
+          name: meta.name || code,
+          flag: meta.flag || '',
+          capital: meta.capital || 'N/A',
+          population: meta.population || null,
+          currencies: meta.currencies || 'N/A',
+          languages: meta.languages || 'N/A',
+          region: meta.region || 'Africa',
+          indicators: {},
+          score: null,
+          africanRank: null,
+          globalRank: null,
+          historicalScores: [],
+        };
+      });
+
+      const BATCH_SIZE = 8;
+      let fetchFailed = false;
+
+      for (let i = 0; i < initialCountries.length; i += BATCH_SIZE) {
+        const batch = initialCountries.slice(i, i + BATCH_SIZE);
+        try {
+          await Promise.allSettled(
+            batch.map(async country => {
+              const indicators = await fetchAllIndicators(country.code);
+              country.indicators = indicators;
+            })
+          );
+        } catch (_) {
+          fetchFailed = true;
+          break;
+        }
+      }
+
+      if (fetchFailed && initialCountries.every(c => !Object.keys(c.indicators).length)) {
+        throw new Error('API fetch failed');
+      }
+
+      initialCountries.forEach(country => {
+        country.score = calculateBusinessScore(country, initialCountries);
+      });
+
+      rankCountries(initialCountries);
+      countries = initialCountries;
+      cacheData('countries_all', countries);
+      setStatus('live');
+    } catch (_) {
+      // Fetch failed - try cache
+      const cachedCountries = getCachedData('countries_all');
+      if (cachedCountries) {
+        countries = cachedCountries.data;
+        rankCountries(countries);
+        setStatus('cached');
+      } else {
+        showError(
+          'Unable to load business data',
+          'The World Bank API may be unavailable. Check your connection and retry.'
+        );
+        setStatus('error');
+        return;
+      }
     }
   }
 
   STATE.countries = countries;
   STATE.dataLoaded = true;
 
-  // Apply default filter (show all, sort by score desc)
   applyFilters();
 
-  // Render
   hideLoadingSkeleton();
   renderDashboard();
 
-  // Start insights ticker
   const insights = generateInsights(STATE.countries);
   rotateInsights(insights);
 
   hideError();
 }
 
-/* ============================================================
-   STARTUP — Run when DOM is ready
-   ============================================================ */
 document.addEventListener('DOMContentLoaded', () => {
   initEventListeners();
   init().catch(err => {
