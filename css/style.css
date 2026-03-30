@@ -17,6 +17,8 @@
   --red:      #f87171;
   --red-bg:   rgba(248,113,113,.12);
 
+  --accent:   #34d399;   /* logo / brand accent colour */
+
   --text:     #f9fafb;   /* primary text */
   --text-2:   #9ca3af;   /* secondary */
   --text-3:   #6b7280;   /* muted */
@@ -634,4 +636,44 @@ ul, ol { list-style:none; }
   .cards-grid { grid-template-columns:1fr; }
   .stats-bar  { grid-template-columns:1fr; }
   .similar-grid { grid-template-columns:1fr; }
+}
+
+/* ──────────────────────────────────────────
+   CARD SKELETON — alias so JS class matches
+────────────────────────────────────────── */
+.card-skeleton { height:160px; background:var(--surface); border-radius:var(--r2); border:1px solid var(--border); animation:pulse 1.5s ease-in-out infinite; }
+
+/* ──────────────────────────────────────────
+   PROFILE HERO — bg gradient + content flex
+────────────────────────────────────────── */
+.prof-hero         { position:relative; overflow:hidden; }
+.prof-hero-bg      { position:absolute; inset:0; border-radius:var(--r2); }
+.prof-hero-content { display:flex; align-items:flex-start; gap:20px; flex-wrap:wrap; flex:1; position:relative; z-index:1; }
+
+/* ──────────────────────────────────────────
+   NEWS SECTION — article cards
+────────────────────────────────────────── */
+.news-section { }
+.news-list    { display:flex; flex-direction:column; gap:10px; }
+.news-item    {
+  display:block; padding:12px; background:var(--raised);
+  border:1px solid var(--border); border-radius:var(--r);
+  text-decoration:none; color:inherit; transition:border-color var(--t);
+}
+.news-item:hover    { border-color:var(--green); }
+.news-meta          { display:flex; align-items:center; gap:10px; margin-bottom:5px; }
+.news-source        { font-size:.65rem; color:var(--green); font-family:var(--mono); font-weight:600; }
+.news-date          { font-size:.65rem; color:var(--text-3); }
+.news-headline      { font-size:.8rem; font-weight:600; color:var(--text); line-height:1.45; margin-bottom:4px; }
+.news-desc          { font-size:.72rem; color:var(--text-2); line-height:1.5; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.news-empty         { font-size:.8rem; color:var(--text-3); padding:8px 0; }
+
+/* ──────────────────────────────────────────
+   EXCHANGE RATE PILL
+────────────────────────────────────────── */
+.fx-pill {
+  display:inline-flex; align-items:center; padding:3px 10px;
+  background:var(--raised); border:1px solid var(--border);
+  border-radius:20px; font-size:.68rem; color:var(--text-2);
+  font-family:var(--mono); margin-top:8px;
 }

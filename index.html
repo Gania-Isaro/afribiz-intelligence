@@ -42,7 +42,7 @@
         <svg id="theme-icon-moon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
         <svg id="theme-icon-sun" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></svg>
       </button>
-      <a href="https://github.com" target="_blank" rel="noopener noreferrer" class="icon-btn" title="GitHub" aria-label="View source on GitHub">
+      <a href="https://github.com/Gania-Isaro/afribiz-intelligence" target="_blank" rel="noopener noreferrer" class="icon-btn" title="GitHub" aria-label="View source on GitHub">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
       </a>
     </div>
@@ -95,9 +95,9 @@
           <div class="section-label">Sort by</div>
           <div class="btn-group" id="sortButtons" role="group" aria-label="Sort options">
             <button class="sort-btn active" data-sort="score">Score</button>
-            <button class="sort-btn" data-sort="days">Speed</button>
-            <button class="sort-btn" data-sort="cost">Cost</button>
-            <button class="sort-btn" data-sort="tax">Tax</button>
+            <button class="sort-btn" data-sort="days">Unempl.</button>
+            <button class="sort-btn" data-sort="cost">Inflat.</button>
+            <button class="sort-btn" data-sort="tax">Tax Rev</button>
           </div>
           <div class="sort-order" id="sortOrderBtns" role="group" aria-label="Sort direction">
             <button class="order-btn active" data-order="desc">&#8595; Desc</button>
@@ -153,7 +153,7 @@
         <!-- Stats bar - 4 aggregate live figures -->
         <div id="stats-bar" class="stats-bar" aria-label="Summary statistics">
           <div class="stat-item">
-            <span class="stat-label">Avg. days to register</span>
+            <span class="stat-label">Avg. inflation rate</span>
             <span class="stat-value" id="statAvgDays"><span class="mono">—</span></span>
           </div>
           <div class="stat-item">
@@ -161,11 +161,11 @@
             <span class="stat-value" id="statAvgScore"><span class="mono">—</span></span>
           </div>
           <div class="stat-item">
-            <span class="stat-label">Fastest registration</span>
+            <span class="stat-label">Lowest inflation</span>
             <span class="stat-value" id="statFastest">—</span>
           </div>
           <div class="stat-item">
-            <span class="stat-label">Lowest tax rate</span>
+            <span class="stat-label">Highest internet access</span>
             <span class="stat-value" id="statLowestTax">—</span>
           </div>
         </div>
@@ -261,7 +261,7 @@
       <div class="footer-links">
         <a href="https://datahelpdesk.worldbank.org/knowledgebase/articles/898599" target="_blank" rel="noopener">World Bank API</a>
         <a href="https://restcountries.com/#api-endpoints-v3" target="_blank" rel="noopener">REST Countries API</a>
-        <a href="https://github.com" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/Gania-Isaro/afribiz-intelligence" target="_blank" rel="noopener">GitHub</a>
       </div>
       <p class="footer-note">Powered by World Bank Open Data &amp; REST Countries API &middot; Data reflects most recent available indicators</p>
     </div>
@@ -270,6 +270,6 @@
   <!-- TOAST NOTIFICATIONS -->
   <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="false"></div>
 
-  <script src="js/app.js"></script>
+  <script src="js/app.js?v=6"></script>
 </body>
 </html>

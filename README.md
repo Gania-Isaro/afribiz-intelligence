@@ -19,11 +19,12 @@ By putting all this data in one place, the dashboard saves time, reduces confusi
 
 ## Try it Out!
 You can access the live app through our load balancer:
-- **Main Link:** [https://afribiz-intelligence.gania.tech](https://afribiz-intelligence.gania.tech)
+- **Main Link (HTTPS):** [https://afribiz-intelligence.gania.tech](https://afribiz-intelligence.gania.tech)
+- **Load Balancer (IP):** [http://3.89.88.69/](http://3.89.88.69/)
 
-Or directly through the servers:
-- [http://52.70.87.10/](http://52.70.87.10/)
-- [http://3.93.218.74/](http://3.93.218.74/)
+Or directly through the individual servers:
+- Web01: [http://52.70.87.10/](http://52.70.87.10/)
+- Web02: [http://3.93.218.74/](http://3.93.218.74/)
 
 ---
 
@@ -41,10 +42,9 @@ Or directly through the servers:
 I wanted to keep this project simple and fast, so I didn't use any fancy frameworks like React or Vue. It's built with:
 - **HTML5 & CSS3:** For the structure and beautiful design.
 - **Vanilla JavaScript:** For all the logic and fetching data.
-- **World Bank API:** This is where all the economic data comes from. — [Documentation](https://datahelpdesk.worldbank.org/knowledgebase/topics/125589)
-- **REST Countries API:** Used for flags and basic country info. — [Documentation](https://restcountries.com)
-- **GNews API:** To show the latest business headlines. — [Documentation](https://gnews.io/docs)
-- **ExchangeRate-API:** Provides live currency conversion rates. — [Documentation](https://www.exchangerate-api.com)
+- **World Bank API:** This is where all the economic data comes from.
+- **REST Countries API:** Used for flags and basic country info.
+- **GNews API:** To show the latest business headlines.
 
 ---
 
@@ -71,18 +71,6 @@ To make sure the app is always online and fast, I set up a professional web infr
 
 ---
 
-## Challenges Faced & How I Overcame Them
-Building this was exciting, but I ran into a few roadblocks:
-
-- **Missing Data:** Many countries didn't have data for every year in the World Bank database.
-  - **Solution:** I implemented a "Most Recent Value" (MRV) filter to ensure we always get the latest available information.
-- **API Limits:** Free API tiers for news and exchange rates have daily limits.
-  - **Solution:** I built a custom **caching system** using `localStorage` so that data is saved for a few hours, reducing the number of requests.
-- **Complexity without Frameworks:** Managing everything in Vanilla JS can get messy.
-  - **Solution:** I used a centralized **State Management** pattern to keep the logic organized and easy to debug.
-
----
-
 ## What I Learned
 Working on this project was a huge learning experience for me. I learned:
 - How to fetch and handle data from multiple APIs at once.
@@ -93,12 +81,35 @@ Working on this project was a huge learning experience for me. I learned:
 
 ---
 
-## Credits & Acknowledgments
-I want to say a huge thank you to the following API providers for making their data accessible:
-- **[World Bank API](https://datahelpdesk.worldbank.org/knowledgebase/topics/125589)** for the economic indicators — free, no key required.
-- **[REST Countries API](https://restcountries.com)** for the national meta-data and flags — free, no key required.
-- **[GNews API](https://gnews.io/docs)** for the business news headlines — free tier, 100 requests/day.
-- **[ExchangeRate-API](https://www.exchangerate-api.com/docs)** for the live currency conversion rates — free tier available.
+## Challenges I Faced
+
+**1. World Bank API data gaps**
+The biggest challenge was that the World Bank doesn't have data for every indicator for every country — especially smaller or conflict-affected nations like South Sudan or Somalia. I solved this by making the scoring algorithm flexible: it still calculates a score if at least 2 out of the weighted indicators have data, and it gracefully shows "N/A" for anything missing.
+
+**2. Avoiding API rate limits**
+With 54 countries and multiple indicators each, a naive implementation would fire hundreds of API calls at once and hit rate limits immediately. I solved this by fetching indicators in batches of 8 countries at a time and caching all responses in `localStorage` for 4 hours — so the app only needs to make live calls once per session.
+
+**3. Client-side API key security**
+Because this is a pure frontend app with no backend server, API keys cannot be fully hidden from the browser. I minimized exposure by keeping keys out of any public `.env` files and providing them directly in the config. For a production app, the correct solution would be a backend proxy server that makes the API calls on behalf of the client.
+
+**4. Consistent UI across 54 countries**
+Country names, flags, and metadata came from REST Countries API, but some entries used different name formats than the World Bank expected. I had to normalize country codes and handle edge cases where REST Countries returned extra metadata the app didn't need.
+
+**5. Load balancer configuration**
+Setting up HAProxy to correctly distribute traffic between two Nginx servers while ensuring session consistency took several iterations. I had to configure health checks so the load balancer would automatically stop sending traffic to a server that went down.
+
+---
+
+## API Credits & Documentation
+
+This application uses the following external APIs — thank you to their developers:
+
+| API | Purpose | Documentation | Free Tier |
+|-----|---------|---------------|-----------|
+| [World Bank Open Data](https://datahelpdesk.worldbank.org/knowledgebase/articles/898599) | Business indicators & economic data | [API Docs](https://datahelpdesk.worldbank.org/knowledgebase/articles/898599) | No key required |
+| [REST Countries](https://restcountries.com) | Country names, flags, capitals, currencies | [API Docs](https://restcountries.com/#api-endpoints-v3) | No key required |
+| [GNews API](https://gnews.io) | Business news headlines per country | [API Docs](https://gnews.io/docs) | 100 requests/day |
+| [ExchangeRate-API](https://www.exchangerate-api.com) | Live currency conversion rates | [API Docs](https://www.exchangerate-api.com/docs) | 1,500 requests/month |
 
 ---
 

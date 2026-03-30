@@ -18,13 +18,13 @@ const CONFIG = {
   // ── GNews API — business headlines per country ────────────
   // Free: 100 req/day  Sign up: https://gnews.io
   // Paste your key here after signing up:
-  GNEWS_API_KEY:  '',
-  GNEWS_BASE:     'https://gnews.io/api/v4',
+  GNEWS_API_KEY:  '4fccb62daf321b4ad5855fde84e13a73',
+  GNEWS_BASE:     '/api/news',
 
   // ── ExchangeRate-API — live currency conversion ───────────
   // Free: 1,500 req/month  Sign up: https://app.exchangerate-api.com
   // Paste your key here after signing up:
-  EXCHANGE_RATE_KEY:  '',
+  EXCHANGE_RATE_KEY:  'c772e53941e3e01b7bdfb6e9',
   EXCHANGE_RATE_BASE: 'https://v6.exchangerate-api.com/v6',
 
   // ── App settings ──────────────────────────────────────────
@@ -42,92 +42,81 @@ const CONFIG = {
   NEWS_ARTICLE_COUNT: 3,
 };
 
+// Increment this when INDICATORS change to bust stale localStorage cache
+const CACHE_VERSION = 'v3';
+
 /* ============================================================
    INDICATOR DEFINITIONS
-   Add or remove indicators here — they flow through automatically.
+   Uses actively-maintained World Bank indicators (all updated 2020–present).
+   The legacy Doing Business series (IC.BUS/REG/TAX/LGL) was discontinued
+   in 2021 and returns null for all countries — these are replacements.
    Higher normalizedScore always = better business environment.
    Set `inverted: true` for indicators where lower raw = better.
    ============================================================ */
 const INDICATORS = {
-  easeBusiness: {
-    code: 'IC.BUS.EASE.XQ',
-    label: 'Ease of Doing Business',
-    unit: 'score (0–100)',
+  gdpPerCapita: {
+    code: 'NY.GDP.PCAP.CD',
+    label: 'GDP per Capita',
+    unit: 'USD',
     inverted: false,
-    weight: 0.25,
-    description: 'World Bank ease of doing business score',
+    weight: 0.20,
+    description: 'Gross domestic product per person in current US dollars',
   },
-  daysToRegister: {
-    code: 'IC.REG.DURS',
-    label: 'Days to Start a Business',
-    unit: 'days',
+  inflation: {
+    code: 'FP.CPI.TOTL.ZG',
+    label: 'Inflation Rate',
+    unit: '%',
     inverted: true,
     weight: 0.20,
-    description: 'Calendar days required to complete business registration',
+    description: 'Annual consumer price inflation — lower is better for business',
   },
-  costToRegister: {
-    code: 'IC.REG.COST.PC.ZS',
-    label: 'Cost to Start a Business',
-    unit: '% GNI per capita',
+  unemployment: {
+    code: 'SL.UEM.TOTL.ZS',
+    label: 'Unemployment Rate',
+    unit: '% of labour force',
     inverted: true,
     weight: 0.15,
-    description: 'Official cost of registration as % of GNI per capita',
+    description: 'Share of labour force that is unemployed',
   },
-  procedures: {
-    code: 'IC.REG.PROC',
-    label: 'Registration Procedures',
-    unit: 'steps',
-    inverted: true,
-    weight: 0.00,
-    description: 'Number of procedures required to register a business',
+  internetAccess: {
+    code: 'IT.NET.USER.ZS',
+    label: 'Internet Access',
+    unit: '% of population',
+    inverted: false,
+    weight: 0.20,
+    description: 'Individuals using the internet as % of population',
   },
-  taxRate: {
-    code: 'IC.TAX.TOTL.CP.ZS',
-    label: 'Total Tax Rate',
-    unit: '% of commercial profit',
-    inverted: true,
+  electricityAccess: {
+    code: 'EG.ELC.ACCS.ZS',
+    label: 'Electricity Access',
+    unit: '% of population',
+    inverted: false,
     weight: 0.15,
-    description: 'Total tax and contribution rate as % of commercial profit',
+    description: 'Population with access to electricity',
   },
-  legalRights: {
-    code: 'IC.LGL.CRED.XQ',
-    label: 'Legal Rights Strength',
-    unit: 'index (0–12)',
+  taxRevenue: {
+    code: 'GC.TAX.TOTL.GD.ZS',
+    label: 'Tax Revenue',
+    unit: '% of GDP',
     inverted: false,
     weight: 0.10,
-    description: 'Strength of legal rights index for borrowers and lenders',
-  },
-  electricityDays: {
-    code: 'IC.ELC.TIME',
-    label: 'Time to Get Electricity',
-    unit: 'days',
-    inverted: true,
-    weight: 0.05,
-    description: 'Days to obtain a permanent electricity connection',
+    description: 'Tax revenue as % of GDP — proxy for fiscal stability',
   },
   corruption: {
     code: 'IC.FRM.CORR.ZS',
     label: 'Corruption Prevalence',
     unit: '% of firms',
     inverted: true,
-    weight: 0.10,
-    description: 'Percentage of firms experiencing corruption',
-  },
-  taxRevenue: {
-    code: 'GC.TAX.TOTL.GD.ZS',
-    label: 'Tax Revenue (GDP %)',
-    unit: '% of GDP',
-    inverted: false,
     weight: 0.00,
-    description: 'Tax revenue as a percentage of GDP',
+    description: 'Percentage of firms experiencing corruption (reference only)',
   },
   gdp: {
     code: 'NY.GDP.MKTP.CD',
-    label: 'GDP (Current USD)',
+    label: 'GDP (Total)',
     unit: 'USD',
     inverted: false,
     weight: 0.00,
-    description: 'Gross domestic product in current US dollars',
+    description: 'Gross domestic product in current US dollars (reference only)',
   },
 };
 
@@ -141,7 +130,7 @@ const AFRICAN_COUNTRY_CODES = [
   'GA','GM','GH','GN','GW','KE','LS','LR','LY','MG',
   'MW','ML','MR','MU','MA','MZ','NA','NE','NG','RW',
   'ST','SN','SL','SO','ZA','SS','SD','TZ','TG','TN',
-  'UG','ZM','ZW','MK',
+  'UG','ZM','ZW','SC',
 ];
 
 /* ============================================================
@@ -585,7 +574,7 @@ async function fetchHistoricalData(countryCode) {
   const cached = getCachedData(cacheKey);
   if (cached) return cached.data;
 
-  const url = `${CONFIG.WORLD_BANK_BASE}/country/${countryCode}/indicator/IC.BUS.EASE.XQ?format=json&date=${CONFIG.DATA_YEAR_START}:${CONFIG.DATA_YEAR_END}&per_page=20`;
+  const url = `${CONFIG.WORLD_BANK_BASE}/country/${countryCode}/indicator/NY.GDP.PCAP.CD?format=json&date=${CONFIG.DATA_YEAR_START}:${CONFIG.DATA_YEAR_END}&per_page=20`;
   const response = await fetchWithTimeout(url);
   if (!response || !response.ok) return [];
 
@@ -624,8 +613,8 @@ async function fetchCountryNews(countryName) {
     return cached.data;
   }
 
-  const query = encodeURIComponent(`${countryName} business economy`);
-  const url   = `${CONFIG.GNEWS_BASE}/search?q=${query}&lang=en&country=any&max=${CONFIG.NEWS_ARTICLE_COUNT}&apikey=${CONFIG.GNEWS_API_KEY}`;
+  const query = encodeURIComponent(`${countryName} economy`);
+  const url   = `${CONFIG.GNEWS_BASE}/search?q=${query}&lang=en&max=${CONFIG.NEWS_ARTICLE_COUNT}&apikey=${CONFIG.GNEWS_API_KEY}`;
 
   const response = await fetchWithTimeout(url);
   if (!response || !response.ok) return [];
@@ -733,10 +722,18 @@ async function renderNewsSection(countryName, container) {
   if (!CONFIG.GNEWS_API_KEY || !container) return;
 
   const articles = await fetchCountryNews(countryName);
-  if (!articles.length) return;
 
   const section = el('div', { className: 'profile-section news-section' });
   const title   = el('div', { className: 'profile-section-title', textContent: 'Recent Business News' });
+
+  if (!articles.length) {
+    const empty = el('p', { className: 'news-empty', textContent: 'No recent news found.' });
+    empty.style.color = 'var(--text-3)';
+    empty.style.fontSize = '0.875rem';
+    section.append(title, empty);
+    container.appendChild(section);
+    return;
+  }
   const list    = el('div', { className: 'news-list' });
 
   articles.forEach(article => {
@@ -864,16 +861,16 @@ function applyFilters() {
         bVal = b.score ?? -1;
         break;
       case 'days':
-        aVal = a.indicators.daysToRegister?.value ?? Infinity;
-        bVal = b.indicators.daysToRegister?.value ?? Infinity;
+        aVal = a.indicators.unemployment?.value ?? Infinity;
+        bVal = b.indicators.unemployment?.value ?? Infinity;
         return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
       case 'cost':
-        aVal = a.indicators.costToRegister?.value ?? Infinity;
-        bVal = b.indicators.costToRegister?.value ?? Infinity;
+        aVal = a.indicators.inflation?.value ?? Infinity;
+        bVal = b.indicators.inflation?.value ?? Infinity;
         return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
       case 'tax':
-        aVal = a.indicators.taxRate?.value ?? Infinity;
-        bVal = b.indicators.taxRate?.value ?? Infinity;
+        aVal = a.indicators.taxRevenue?.value ?? Infinity;
+        bVal = b.indicators.taxRevenue?.value ?? Infinity;
         return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
       default:
         aVal = a.score ?? -1;
@@ -902,32 +899,37 @@ function generateInsights(countries) {
   if (!withScore.length) return ['Loading Africa business data…'];
 
   const top = withScore[0];
-  const fastest = countries
-    .filter(c => c.indicators.daysToRegister?.value != null)
-    .sort((a, b) => a.indicators.daysToRegister.value - b.indicators.daysToRegister.value)[0];
-  const lowestTax = countries
-    .filter(c => c.indicators.taxRate?.value != null)
-    .sort((a, b) => a.indicators.taxRate.value - b.indicators.taxRate.value)[0];
-  const highestScore = withScore[0];
+  const lowestInflation = countries
+    .filter(c => c.indicators.inflation?.value != null)
+    .sort((a, b) => a.indicators.inflation.value - b.indicators.inflation.value)[0];
+  const highestInternet = countries
+    .filter(c => c.indicators.internetAccess?.value != null)
+    .sort((a, b) => b.indicators.internetAccess.value - a.indicators.internetAccess.value)[0];
+  const highestGdpPc = countries
+    .filter(c => c.indicators.gdpPerCapita?.value != null)
+    .sort((a, b) => b.indicators.gdpPerCapita.value - a.indicators.gdpPerCapita.value)[0];
 
   if (top) insights.push(`${top.name} ranks #1 in Africa for business environment`);
 
-  if (fastest) {
-    const days = Math.round(fastest.indicators.daysToRegister.value);
-    insights.push(`${fastest.name} has the fastest business registration: ${days} ${days === 1 ? 'day' : 'days'}`);
+  if (lowestInflation) {
+    insights.push(`${lowestInflation.name} has Africa's most stable prices at ${lowestInflation.indicators.inflation.value.toFixed(1)}% inflation`);
   }
 
-  if (lowestTax) {
-    insights.push(`${lowestTax.name} has Africa's lowest total tax rate at ${lowestTax.indicators.taxRate.value.toFixed(1)}%`);
+  if (highestInternet) {
+    insights.push(`${highestInternet.name} leads Africa in internet connectivity at ${highestInternet.indicators.internetAccess.value.toFixed(0)}% access`);
   }
 
-  // Average days
-  const avgDays = countries
-    .filter(c => c.indicators.daysToRegister?.value != null)
-    .map(c => c.indicators.daysToRegister.value);
-  if (avgDays.length) {
-    const avg = Math.round(avgDays.reduce((a, b) => a + b, 0) / avgDays.length);
-    insights.push(`On average, it takes ${avg} days to register a business in Africa`);
+  if (highestGdpPc) {
+    insights.push(`${highestGdpPc.name} has Africa's highest GDP per capita at $${formatNumber(highestGdpPc.indicators.gdpPerCapita.value)}`);
+  }
+
+  // Average inflation
+  const inflArr = countries
+    .filter(c => c.indicators.inflation?.value != null)
+    .map(c => c.indicators.inflation.value);
+  if (inflArr.length) {
+    const avg = (inflArr.reduce((a, b) => a + b, 0) / inflArr.length).toFixed(1);
+    insights.push(`Average inflation across Africa is ${avg}% — stability is a key business factor`);
   }
 
   // East Africa leader
@@ -948,8 +950,8 @@ function generateInsights(countries) {
     insights.push(`${southern[0].name} is Southern Africa's top-ranked business destination`);
   }
 
-  if (highestScore) {
-    insights.push(`The top score across Africa this period is ${highestScore.score} — held by ${highestScore.name}`);
+  if (top) {
+    insights.push(`The top business environment score across Africa is ${top.score} — held by ${top.name}`);
   }
 
   return insights.length ? insights : ['Explore 54 African nations by business environment score'];
@@ -1043,21 +1045,21 @@ function buildCountryCard(country) {
   top.append(left, score);
   inner.appendChild(top);
 
-  // ── Stats row: registration days + tax rate ──
+  // ── Stats row: GDP per capita + inflation ──
   const stats = el('div', { className: 'card-stats' });
 
-  const days = country.indicators.daysToRegister?.value;
-  const tax  = country.indicators.taxRate?.value;
+  const gdpPc    = country.indicators.gdpPerCapita?.value;
+  const inflation = country.indicators.inflation?.value;
 
-  const statDays = el('div', { className: 'card-stat' });
-  statDays.appendChild(el('div', { className: 'card-stat-val', textContent: days != null ? formatDays(days) : '—' }));
-  statDays.appendChild(el('div', { className: 'card-stat-lbl', textContent: 'To Register' }));
+  const statGdp = el('div', { className: 'card-stat' });
+  statGdp.appendChild(el('div', { className: 'card-stat-val', textContent: gdpPc != null ? '$' + formatNumber(gdpPc) : '—' }));
+  statGdp.appendChild(el('div', { className: 'card-stat-lbl', textContent: 'GDP per Capita' }));
 
-  const statTax = el('div', { className: 'card-stat' });
-  statTax.appendChild(el('div', { className: 'card-stat-val', textContent: tax != null ? tax.toFixed(1) + '%' : '—' }));
-  statTax.appendChild(el('div', { className: 'card-stat-lbl', textContent: 'Tax Rate' }));
+  const statInfl = el('div', { className: 'card-stat' });
+  statInfl.appendChild(el('div', { className: 'card-stat-val', textContent: inflation != null ? inflation.toFixed(1) + '%' : '—' }));
+  statInfl.appendChild(el('div', { className: 'card-stat-lbl', textContent: 'Inflation' }));
 
-  stats.append(statDays, statTax);
+  stats.append(statGdp, statInfl);
   inner.appendChild(stats);
 
   // ── Score progress bar ──
@@ -1112,11 +1114,11 @@ function buildRegularCard(c)  { return buildCountryCard(c); }
  */
 function getTopStrength(country) {
   const i = country.indicators;
-  if (i.daysToRegister?.value != null && i.daysToRegister.value <= 5) return '⚡ Fast Setup';
-  if (i.taxRate?.value        != null && i.taxRate.value        <  25) return '💚 Low Tax';
-  if (i.legalRights?.value    != null && i.legalRights.value    >= 9)  return '⚖️ Strong Rights';
-  if (i.corruption?.value     != null && i.corruption.value     <  15) return '✅ Low Corruption';
-  if (country.score !== null  && country.score >= 65) return '🏆 Top Performer';
+  if (i.gdpPerCapita?.value      != null && i.gdpPerCapita.value      > 5000) return '💰 High GDP/Cap';
+  if (i.inflation?.value         != null && i.inflation.value         < 5)    return '📊 Stable Prices';
+  if (i.internetAccess?.value    != null && i.internetAccess.value    > 60)   return '🌐 Digital Ready';
+  if (i.electricityAccess?.value != null && i.electricityAccess.value > 90)   return '💡 Power Ready';
+  if (country.score !== null && country.score >= 65) return '🏆 Top Performer';
   return '📊 Explore Data';
 }
 
@@ -1131,16 +1133,16 @@ function getTopStrength(country) {
 function renderStatsBar() {
   const countries = STATE.filtered.length ? STATE.filtered : STATE.countries;
 
-  // Average days
-  const daysArr = countries
-    .filter(c => c.indicators.daysToRegister?.value != null)
-    .map(c => c.indicators.daysToRegister.value);
+  // Average inflation rate
+  const inflArr = countries
+    .filter(c => c.indicators.inflation?.value != null)
+    .map(c => c.indicators.inflation.value);
   const avgDaysEl = document.getElementById('statAvgDays');
   if (avgDaysEl) {
-    const avg = daysArr.length
-      ? Math.round(daysArr.reduce((a, b) => a + b, 0) / daysArr.length)
+    const avg = inflArr.length
+      ? (inflArr.reduce((a, b) => a + b, 0) / inflArr.length).toFixed(1)
       : null;
-    const span = el('span', { className: 'mono', textContent: avg !== null ? String(avg) : '—' });
+    const span = el('span', { className: 'mono', textContent: avg !== null ? avg + '%' : '—' });
     avgDaysEl.textContent = '';
     avgDaysEl.appendChild(span);
   }
@@ -1159,25 +1161,25 @@ function renderStatsBar() {
     avgScoreEl.appendChild(span);
   }
 
-  // Fastest registration
+  // Lowest inflation country
   const fastestEl = document.getElementById('statFastest');
   if (fastestEl) {
-    const fastest = countries
-      .filter(c => c.indicators.daysToRegister?.value != null)
-      .sort((a, b) => a.indicators.daysToRegister.value - b.indicators.daysToRegister.value)[0];
-    fastestEl.textContent = fastest
-      ? `${fastest.flag} ${fastest.name} (${Math.round(fastest.indicators.daysToRegister.value)}d)`
+    const lowest = countries
+      .filter(c => c.indicators.inflation?.value != null)
+      .sort((a, b) => a.indicators.inflation.value - b.indicators.inflation.value)[0];
+    fastestEl.textContent = lowest
+      ? `${lowest.flag} ${lowest.name} (${lowest.indicators.inflation.value.toFixed(1)}%)`
       : '—';
   }
 
-  // Lowest tax
+  // Highest internet access
   const lowTaxEl = document.getElementById('statLowestTax');
   if (lowTaxEl) {
-    const lowest = countries
-      .filter(c => c.indicators.taxRate?.value != null)
-      .sort((a, b) => a.indicators.taxRate.value - b.indicators.taxRate.value)[0];
-    lowTaxEl.textContent = lowest
-      ? `${lowest.flag} ${lowest.name} (${lowest.indicators.taxRate.value.toFixed(1)}%)`
+    const highest = countries
+      .filter(c => c.indicators.internetAccess?.value != null)
+      .sort((a, b) => b.indicators.internetAccess.value - a.indicators.internetAccess.value)[0];
+    lowTaxEl.textContent = highest
+      ? `${highest.flag} ${highest.name} (${highest.indicators.internetAccess.value.toFixed(0)}%)`
       : '—';
   }
 }
@@ -1374,8 +1376,17 @@ async function navigateToProfile(countryCode) {
   switchView('profile');
   renderCountryProfile(country);
 
-  // Fetch and render historical chart
-  const history = await fetchHistoricalData(countryCode);
+  // Fetch news and historical chart in parallel
+  const [history] = await Promise.all([
+    fetchHistoricalData(countryCode),
+    renderNewsSection(country.name, document.getElementById('profileContent')),
+  ]);
+
+  // Store historical scores so trend arrows work in the indicators list
+  if (history.length) {
+    country.historicalScores = history.map(d => d.value).reverse();
+  }
+
   const trendSection = document.getElementById('trendSection');
   if (history.length >= 2) {
     if (trendSection) trendSection.hidden = false;
@@ -1450,7 +1461,7 @@ function buildProfileShell() {
   // Trend chart section (hidden until data loads)
   const trendSection = el('div', { id: 'trendSection', className: 'profile-section' });
   trendSection.hidden = true;
-  const trendTitle = el('h2', { className: 'profile-section-title', textContent: 'Business Environment Score Over Time' });
+  const trendTitle = el('h2', { className: 'profile-section-title', textContent: 'GDP per Capita Trend (2015–2023)' });
   const trendWrap = el('div', { className: 'trend-chart-container' });
   const trendCanvas = el('canvas', { id: 'trendChart' });
   trendWrap.appendChild(trendCanvas);
@@ -1672,52 +1683,22 @@ function renderSetupTimeline(country) {
   if (!container) return;
   container.innerHTML = '';
 
-  const days = country.indicators.daysToRegister?.value;
-  const costPct = country.indicators.costToRegister?.value;
-
   const STEPS = [
-    { label: 'Name Search', daysShare: 0.08 },
-    { label: 'Document Prep', daysShare: 0.15 },
-    { label: 'Registration Filing', daysShare: 0.30 },
-    { label: 'Tax Registration', daysShare: 0.22 },
-    { label: 'Bank Account', daysShare: 0.15 },
-    { label: 'Operating Permits', daysShare: 0.10 },
+    { label: 'Name Search & Reservation' },
+    { label: 'Document Preparation' },
+    { label: 'Business Registration' },
+    { label: 'Tax Registration' },
+    { label: 'Bank Account Opening' },
+    { label: 'Operational Permits' },
   ];
 
-  let totalDays = 0;
-
   STEPS.forEach((step, i) => {
-    const stepDays = days != null ? Math.max(1, Math.round(days * step.daysShare)) : null;
-    if (stepDays) totalDays += stepDays;
-
-    const stepEl = el('div', { className: 'timeline-step' });
-    const node   = el('div', { className: 'timeline-node mono', textContent: String(i + 1) });
-    const label  = el('div', { className: 'timeline-label', textContent: step.label });
-
+    const stepEl = el('div', { className: 'timeline-step done' });
+    const node   = el('div', { className: 'step-dot', textContent: String(i + 1) });
+    const label  = el('div', { className: 'step-label', textContent: step.label });
     stepEl.append(node, label);
-
-    if (stepDays !== null) {
-      const pill = el('div', {
-        className: 'timeline-days mono',
-        textContent: formatDays(stepDays),
-      });
-      stepEl.appendChild(pill);
-    }
-
     container.appendChild(stepEl);
   });
-
-  // Total summary
-  if (days != null) {
-    const total = el('div', { className: 'timeline-total' });
-    total.appendChild(document.createTextNode('Total: '));
-    total.appendChild(el('strong', { textContent: formatDays(days) }));
-    if (costPct != null) {
-      total.appendChild(document.createTextNode(' · Cost: '));
-      total.appendChild(el('strong', { textContent: costPct.toFixed(1) + '% of GNI per capita' }));
-    }
-    container.after(total);
-  }
 }
 
 /**
@@ -1760,38 +1741,46 @@ function generateProsCons(country) {
   const ind = country.indicators;
   const items = [];
 
-  const days    = ind.daysToRegister?.value;
-  const tax     = ind.taxRate?.value;
-  const legal   = ind.legalRights?.value;
-  const corrupt = ind.corruption?.value;
-  const gdpVal  = ind.gdp?.value;
-  const score   = country.score;
-  const elec    = ind.electricityDays?.value;
-  const cost    = ind.costToRegister?.value;
+  const gdpPc    = ind.gdpPerCapita?.value;
+  const inflation = ind.inflation?.value;
+  const unemploy = ind.unemployment?.value;
+  const internet = ind.internetAccess?.value;
+  const elecAcc  = ind.electricityAccess?.value;
+  const corrupt  = ind.corruption?.value;
+  const gdpVal   = ind.gdp?.value;
+  const score    = country.score;
 
-  if (days != null && days <= 3)
-    items.push({ emoji: '⚡', text: 'Near-instant business registration', positive: true });
-  else if (days != null && days <= 10)
-    items.push({ emoji: '✅', text: `Quick registration at ${Math.round(days)} days`, positive: true });
-  else if (days != null && days > 30)
-    items.push({ emoji: '🐌', text: `Slow registration process (${Math.round(days)} days)`, positive: false });
+  if (gdpPc != null && gdpPc > 5000)
+    items.push({ emoji: '💰', text: `Strong economy: GDP per capita $${formatNumber(gdpPc)}`, positive: true });
+  else if (gdpPc != null && gdpPc < 1000)
+    items.push({ emoji: '📉', text: `Low-income economy ($${formatNumber(gdpPc)} per capita)`, positive: false });
 
-  if (tax != null && tax < 20)
-    items.push({ emoji: '💚', text: `Business-friendly tax rate (${tax.toFixed(1)}%)`, positive: true });
-  else if (tax != null && tax > 50)
-    items.push({ emoji: '🔴', text: `Heavy tax burden (${tax.toFixed(1)}% of profit)`, positive: false });
+  if (inflation != null && inflation < 5)
+    items.push({ emoji: '✅', text: `Stable prices: ${inflation.toFixed(1)}% inflation`, positive: true });
+  else if (inflation != null && inflation > 20)
+    items.push({ emoji: '🔴', text: `High inflation: ${inflation.toFixed(1)}% — business risk`, positive: false });
+  else if (inflation != null && inflation > 10)
+    items.push({ emoji: '🔶', text: `Elevated inflation: ${inflation.toFixed(1)}%`, positive: false });
 
-  if (legal != null && legal >= 8)
-    items.push({ emoji: '⚖️', text: 'Strong investor and creditor legal protections', positive: true });
-  else if (legal != null && legal <= 3)
-    items.push({ emoji: '📜', text: 'Weak legal rights framework for investors', positive: false });
+  if (unemploy != null && unemploy < 6)
+    items.push({ emoji: '👷', text: `Strong labour market (${unemploy.toFixed(1)}% unemployment)`, positive: true });
+  else if (unemploy != null && unemploy > 25)
+    items.push({ emoji: '📋', text: `High unemployment: ${unemploy.toFixed(1)}%`, positive: false });
+
+  if (internet != null && internet > 60)
+    items.push({ emoji: '🌐', text: `Strong digital infrastructure (${internet.toFixed(0)}% internet access)`, positive: true });
+  else if (internet != null && internet < 20)
+    items.push({ emoji: '📡', text: `Limited internet connectivity (${internet.toFixed(0)}%)`, positive: false });
+
+  if (elecAcc != null && elecAcc > 90)
+    items.push({ emoji: '💡', text: `Near-universal electricity access (${elecAcc.toFixed(0)}%)`, positive: true });
+  else if (elecAcc != null && elecAcc < 40)
+    items.push({ emoji: '🔌', text: `Limited electricity access (${elecAcc.toFixed(0)}% of population)`, positive: false });
 
   if (corrupt != null && corrupt < 10)
     items.push({ emoji: '✅', text: 'Low reported business corruption', positive: true });
   else if (corrupt != null && corrupt > 40)
     items.push({ emoji: '⚠️', text: `High corruption risk (${corrupt.toFixed(1)}% of firms)`, positive: false });
-  else if (corrupt != null && corrupt > 25)
-    items.push({ emoji: '🔶', text: 'Moderate corruption concerns reported', positive: false });
 
   if (gdpVal != null && gdpVal > 1e11)
     items.push({ emoji: '🌍', text: `Large economy: GDP $${formatNumber(gdpVal)}`, positive: true });
@@ -1802,16 +1791,6 @@ function generateProsCons(country) {
     items.push({ emoji: '🏆', text: 'Top-tier overall business environment', positive: true });
   else if (score != null && score < 35)
     items.push({ emoji: '📉', text: 'Challenging overall business climate', positive: false });
-
-  if (elec != null && elec < 30)
-    items.push({ emoji: '💡', text: `Fast utility connections (${Math.round(elec)} days for electricity)`, positive: true });
-  else if (elec != null && elec > 120)
-    items.push({ emoji: '🔌', text: `Slow utility access (${Math.round(elec)} days for electricity)`, positive: false });
-
-  if (cost != null && cost < 5)
-    items.push({ emoji: '💰', text: `Very low registration cost (${cost.toFixed(1)}% of GNI)`, positive: true });
-  else if (cost != null && cost > 50)
-    items.push({ emoji: '💸', text: `High registration cost (${cost.toFixed(1)}% of GNI)`, positive: false });
 
   return items;
 }
@@ -1907,7 +1886,7 @@ function renderTrendChart(countryCode, data) {
     data: {
       labels,
       datasets: [{
-        label: 'Ease of Business Score',
+        label: 'GDP per Capita (USD)',
         data: values,
         borderColor: chartColors.line,
         backgroundColor: `${chartColors.line}18`,
@@ -1930,7 +1909,7 @@ function renderTrendChart(countryCode, data) {
           titleColor: '#edf2f7',
           bodyColor: '#718096',
           callbacks: {
-            label: ctx => ` Score: ${ctx.parsed.y.toFixed(1)}`,
+            label: ctx => ` $${formatNumber(ctx.parsed.y)}`,
           },
         },
       },
@@ -1942,8 +1921,8 @@ function renderTrendChart(countryCode, data) {
         y: {
           grid: { color: chartColors.grid },
           ticks: { color: chartColors.label, font: { family: 'JetBrains Mono', size: 10 } },
-          min: Math.max(0, Math.floor(Math.min(...values) - 5)),
-          max: Math.min(100, Math.ceil(Math.max(...values) + 5)),
+          min: Math.max(0, Math.floor(Math.min(...values) * 0.9)),
+          max: Math.ceil(Math.max(...values) * 1.1),
         },
       },
     },
@@ -1964,12 +1943,12 @@ function renderRadarChart(countries) {
   }
 
   const radarIndicators = [
-    { key: 'easeBusiness',    label: 'Ease of Biz' },
-    { key: 'daysToRegister',  label: 'Speed',        invert: true },
-    { key: 'costToRegister',  label: 'Low Cost',     invert: true },
-    { key: 'taxRate',         label: 'Low Tax',      invert: true },
-    { key: 'legalRights',     label: 'Legal Rights' },
-    { key: 'corruption',      label: 'Anti-Corrupt', invert: true },
+    { key: 'gdpPerCapita',      label: 'GDP/Cap' },
+    { key: 'inflation',         label: 'Low Inflation',  invert: true },
+    { key: 'unemployment',      label: 'Employment',     invert: true },
+    { key: 'internetAccess',    label: 'Internet' },
+    { key: 'electricityAccess', label: 'Electricity' },
+    { key: 'taxRevenue',        label: 'Tax Base' },
   ];
 
   const CHART_COLORS = [
@@ -2111,10 +2090,10 @@ function renderComparisonView() {
  */
 function computeWinners(countries) {
   const categories = [
-    { label: 'Best Score', extract: c => c.score, bestIsHigh: true },
-    { label: 'Fastest Setup', extract: c => c.indicators.daysToRegister?.value, bestIsHigh: false },
-    { label: 'Lowest Tax', extract: c => c.indicators.taxRate?.value, bestIsHigh: false },
-    { label: 'Strong Rights', extract: c => c.indicators.legalRights?.value, bestIsHigh: true },
+    { label: 'Best Score',    extract: c => c.score, bestIsHigh: true },
+    { label: 'High GDP/Cap',  extract: c => c.indicators.gdpPerCapita?.value, bestIsHigh: true },
+    { label: 'Low Inflation', extract: c => c.indicators.inflation?.value, bestIsHigh: false },
+    { label: 'Best Internet', extract: c => c.indicators.internetAccess?.value, bestIsHigh: true },
   ];
 
   const result = {};
@@ -2139,7 +2118,7 @@ function computeWinners(countries) {
  */
 function buildComparisonTable(countries) {
   const indicators = Object.entries(INDICATORS).filter(([k]) =>
-    ['easeBusiness','daysToRegister','costToRegister','taxRate','legalRights','corruption','electricityDays','gdp'].includes(k)
+    ['gdpPerCapita','inflation','unemployment','internetAccess','electricityAccess','taxRevenue','corruption','gdp'].includes(k)
   );
 
   const table = el('table', { className: 'comparison-table' });
@@ -2205,16 +2184,16 @@ function buildRankingsShell() {
   wrapper.innerHTML = '';
 
   const cols = [
-    { key: 'rank',  label: 'Rank',          sortable: true },
-    { key: 'flag',  label: '',               sortable: false },
-    { key: 'name',  label: 'Country',        sortable: false },
-    { key: 'score', label: 'Score',          sortable: true },
-    { key: 'days',  label: 'Days',           sortable: true },
-    { key: 'cost',  label: 'Cost %GNI',      sortable: true },
-    { key: 'tax',   label: 'Tax Rate',       sortable: true },
-    { key: 'legal', label: 'Legal Rights',   sortable: true },
-    { key: 'gdp',   label: 'GDP',            sortable: true },
-    { key: 'trend', label: 'Trend',          sortable: false },
+    { key: 'rank',    label: 'Rank',         sortable: true },
+    { key: 'flag',    label: '',             sortable: false },
+    { key: 'name',    label: 'Country',      sortable: false },
+    { key: 'score',   label: 'Score',        sortable: true },
+    { key: 'days',    label: 'Unempl. %',    sortable: true },
+    { key: 'cost',    label: 'Inflation %',  sortable: true },
+    { key: 'tax',     label: 'Internet %',   sortable: true },
+    { key: 'legal',   label: 'Electricity %',sortable: true },
+    { key: 'gdp',     label: 'GDP',          sortable: true },
+    { key: 'trend',   label: 'Trend',        sortable: false },
   ];
 
   const table = el('table', { id: 'rankingsTable', className: 'rankings-table' });
@@ -2280,11 +2259,11 @@ function renderRankingsTable() {
     scoreCell.style.color = getScoreColor(country.score);
     tr.appendChild(scoreCell);
 
-    tr.appendChild(el('td', { className: 'mono', textContent: country.indicators.daysToRegister?.value != null ? Math.round(country.indicators.daysToRegister.value).toString() : 'N/A' }));
-    tr.appendChild(el('td', { className: 'mono', textContent: country.indicators.costToRegister?.value != null ? country.indicators.costToRegister.value.toFixed(1) : 'N/A' }));
-    tr.appendChild(el('td', { className: 'mono', textContent: country.indicators.taxRate?.value != null ? country.indicators.taxRate.value.toFixed(1) : 'N/A' }));
-    tr.appendChild(el('td', { className: 'mono', textContent: country.indicators.legalRights?.value != null ? country.indicators.legalRights.value.toFixed(0) : 'N/A' }));
-    tr.appendChild(el('td', { className: 'mono', textContent: country.indicators.gdp?.value != null ? '$' + formatNumber(country.indicators.gdp.value) : 'N/A' }));
+    tr.appendChild(el('td', { className: 'mono', textContent: country.indicators.unemployment?.value     != null ? country.indicators.unemployment.value.toFixed(1)     : 'N/A' }));
+    tr.appendChild(el('td', { className: 'mono', textContent: country.indicators.inflation?.value        != null ? country.indicators.inflation.value.toFixed(1)        : 'N/A' }));
+    tr.appendChild(el('td', { className: 'mono', textContent: country.indicators.internetAccess?.value   != null ? country.indicators.internetAccess.value.toFixed(1)   : 'N/A' }));
+    tr.appendChild(el('td', { className: 'mono', textContent: country.indicators.electricityAccess?.value!= null ? country.indicators.electricityAccess.value.toFixed(1): 'N/A' }));
+    tr.appendChild(el('td', { className: 'mono', textContent: country.indicators.gdp?.value              != null ? '$' + formatNumber(country.indicators.gdp.value)      : 'N/A' }));
 
     const trend = country.historicalScores?.length ? getTrendArrow(country.historicalScores.slice().reverse()) : 'stable';
     const trendCell = el('td', { className: 'td-trend', textContent: trendEmoji(trend) });
@@ -2310,10 +2289,10 @@ function getTableSortValue(country, col) {
     case 'rank':  return country.africanRank ?? 9999;
     case 'name':  return null;
     case 'score': return country.score ?? -1;
-    case 'days':  return country.indicators.daysToRegister?.value ?? 9999;
-    case 'cost':  return country.indicators.costToRegister?.value ?? 9999;
-    case 'tax':   return country.indicators.taxRate?.value ?? 9999;
-    case 'legal': return country.indicators.legalRights?.value ?? -1;
+    case 'days':  return country.indicators.unemployment?.value     ?? 9999;
+    case 'cost':  return country.indicators.inflation?.value        ?? 9999;
+    case 'tax':   return country.indicators.internetAccess?.value   ?? -1;
+    case 'legal': return country.indicators.electricityAccess?.value ?? -1;
     case 'gdp':   return country.indicators.gdp?.value ?? -1;
     default: return null;
   }
@@ -2348,7 +2327,7 @@ function updateTableSortHeaders() {
  */
 function exportToCSV() {
   try {
-    const headers = ['Rank','Country','Code','Score','Days to Register','Cost %','Tax Rate %','Legal Rights Index','GDP USD','Region'];
+    const headers = ['Rank','Country','Code','Score','GDP per Capita USD','Inflation %','Unemployment %','Internet Access %','Electricity Access %','GDP USD','Region'];
     const rows = STATE.countries
       .filter(c => c.africanRank !== null)
       .sort((a, b) => a.africanRank - b.africanRank)
@@ -2357,11 +2336,12 @@ function exportToCSV() {
         c.name,
         c.code,
         c.score ?? '',
-        c.indicators.daysToRegister?.value?.toFixed(0) ?? '',
-        c.indicators.costToRegister?.value?.toFixed(2) ?? '',
-        c.indicators.taxRate?.value?.toFixed(2) ?? '',
-        c.indicators.legalRights?.value?.toFixed(0) ?? '',
-        c.indicators.gdp?.value?.toFixed(0) ?? '',
+        c.indicators.gdpPerCapita?.value?.toFixed(0)       ?? '',
+        c.indicators.inflation?.value?.toFixed(2)          ?? '',
+        c.indicators.unemployment?.value?.toFixed(2)       ?? '',
+        c.indicators.internetAccess?.value?.toFixed(2)     ?? '',
+        c.indicators.electricityAccess?.value?.toFixed(2)  ?? '',
+        c.indicators.gdp?.value?.toFixed(0)                ?? '',
         c.region || '',
       ].join(','));
 
@@ -2776,6 +2756,17 @@ function resetAllFilters() {
 async function init() {
   setStatus('loading');
   showLoadingSkeleton();
+
+  // Clear stale cache if indicator schema changed
+  try {
+    const storedVersion = localStorage.getItem('afribiz_cache_version');
+    if (storedVersion !== CACHE_VERSION) {
+      Object.keys(localStorage)
+        .filter(k => k.startsWith('afribiz_'))
+        .forEach(k => localStorage.removeItem(k));
+      localStorage.setItem('afribiz_cache_version', CACHE_VERSION);
+    }
+  } catch (_) { /* localStorage unavailable */ }
 
   let countries = [];
 
