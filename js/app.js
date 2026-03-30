@@ -635,7 +635,10 @@ function buildCountryCard(country) {
   // ── Top row: flag + name + score badge ──
   const top   = el('div', { className: 'card-top' });
   const left  = el('div', { className: 'card-left' });
-  const flag  = el('div', { className: 'card-flag',   textContent: country.flag || '🌍' });
+  const flag  = el('div', { className: 'card-flag' });
+  const flagImg = el('img', { src: `https://flagcdn.com/w40/${country.code.toLowerCase()}.png`, alt: country.name, loading: 'lazy' });
+  flagImg.onerror = () => { flag.textContent = country.flag || country.code; };
+  flag.appendChild(flagImg);
   const info  = el('div');
   const name  = el('div', { className: 'card-name',   textContent: country.name });
   const region= el('div', { className: 'card-region', textContent: country.region || 'Africa' });
@@ -1051,7 +1054,12 @@ function renderCountryProfile(country) {
 
   // Flag
   const flagEl = document.getElementById('profileFlag');
-  if (flagEl) flagEl.textContent = country.flag || '';
+  if (flagEl) {
+    flagEl.innerHTML = '';
+    const img = el('img', { src: `https://flagcdn.com/w80/${country.code.toLowerCase()}.png`, alt: country.name });
+    img.onerror = () => { flagEl.textContent = country.flag || country.code; };
+    flagEl.appendChild(img);
+  }
 
   // Name
   const nameEl = document.getElementById('profileCountryName');
@@ -1338,7 +1346,10 @@ function renderSimilarCountries(countryCode) {
 
   for (const s of similar) {
     const card = el('div', { className: 'similar-card', 'data-code': s.code });
-    const flag = el('span', { className: 'similar-flag', textContent: s.flag });
+    const flag = el('span', { className: 'similar-flag' });
+    const sfImg = el('img', { src: `https://flagcdn.com/w40/${s.code.toLowerCase()}.png`, alt: s.name, loading: 'lazy' });
+    sfImg.onerror = () => { flag.textContent = s.flag || s.code; };
+    flag.appendChild(sfImg);
     const info = el('div');
     const name = el('div', { className: 'similar-name', textContent: s.name });
     const score = el('div', {
@@ -1556,7 +1567,11 @@ function renderComparisonView() {
 
   countries.forEach((country, ci) => {
     const col = el('div', { className: 'comparison-col-header' });
-    col.appendChild(el('div', { className: 'comparison-flag', textContent: country.flag }));
+    const cfWrap = el('div', { className: 'comparison-flag' });
+    const cfImg = el('img', { src: `https://flagcdn.com/w80/${country.code.toLowerCase()}.png`, alt: country.name });
+    cfImg.onerror = () => { cfWrap.textContent = country.flag || country.code; };
+    cfWrap.appendChild(cfImg);
+    col.appendChild(cfWrap);
     col.appendChild(el('div', { className: 'comparison-country-name', textContent: country.name }));
     col.appendChild(el('div', {
       className: 'comparison-score-big mono',
@@ -2184,6 +2199,10 @@ async function init() {
     }
   } catch (_) { }
 
+  // Always start with the banner hidden — only show it if we confirm we're offline
+  const offlineBannerEl = document.getElementById('offlineBanner');
+  if (offlineBannerEl) offlineBannerEl.hidden = true;
+
   let countries = [];
 
   if (!navigator.onLine) {
@@ -2281,6 +2300,8 @@ async function init() {
         countries = cachedCountries.data;
         rankCountries(countries);
         setStatus('cached');
+        // We're online but using cache — make sure the offline banner stays hidden
+        if (offlineBannerEl) offlineBannerEl.hidden = true;
       } else {
         showError(
           'Unable to load business data',

@@ -286,6 +286,7 @@ ul, ol { list-style:none; }
 .card-top    { display:flex; align-items:center; justify-content:space-between; gap:8px; }
 .card-left   { display:flex; align-items:center; gap:9px; flex:1; min-width:0; }
 .card-flag   { font-size:1.6rem; line-height:1; flex-shrink:0; }
+.card-flag img { width:28px; height:auto; border-radius:2px; display:block; }
 .card-name   { font-family:var(--head); font-weight:700; font-size:.88rem; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .card-region { font-size:.6rem; color:var(--text-3); margin-top:1px; }
 
@@ -386,6 +387,7 @@ ul, ol { list-style:none; }
   display:flex; align-items:flex-start; gap:20px; flex-wrap:wrap;
 }
 .prof-flag   { font-size:4rem; line-height:1; flex-shrink:0; }
+.prof-flag img { width:80px; height:auto; border-radius:4px; display:block; }
 .prof-name-block { flex:1; min-width:200px; }
 .prof-country-name { font-family:var(--head); font-size:2.2rem; font-weight:800; color:var(--text); line-height:1; margin-bottom:10px; }
 .prof-meta-strip { display:flex; flex-wrap:wrap; gap:5px 14px; }
@@ -400,7 +402,12 @@ ul, ol { list-style:none; }
 .score-ring-svg   { transform:rotate(-90deg); }
 .score-ring-track { fill:none; stroke:var(--border); stroke-width:5; }
 .score-ring-fill  { fill:none; stroke-width:5; stroke-linecap:round; transition:stroke-dashoffset .9s ease; }
-.score-ring-text  { font-family:var(--mono); font-size:1.5rem; font-weight:700; fill:var(--text); }
+.score-ring-text  {
+  font-family:var(--mono); font-size:1.5rem; font-weight:700; fill:var(--text);
+  transform:rotate(90deg);
+  transform-box:fill-box;
+  transform-origin:center;
+}
 .score-ring-sub   { font-size:.55rem; fill:var(--text-3); }
 
 /* ──────────────────────────────────────────
@@ -480,7 +487,8 @@ ul, ol { list-style:none; }
 .similar-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
 .similar-card { background:var(--raised); border:1px solid var(--border); border-radius:var(--r); padding:11px; cursor:pointer; display:flex; align-items:center; gap:9px; transition:all var(--t); }
 .similar-card:hover { border-color:var(--border-s); }
-.similar-flag, .sim-flag  { font-size:1.5rem; }
+.similar-flag, .sim-flag  { font-size:1.5rem; flex-shrink:0; }
+.similar-flag img, .sim-flag img { width:32px; height:auto; border-radius:2px; display:block; }
 .similar-name, .sim-name  { font-size:.78rem; font-weight:600; color:var(--text); }
 .similar-score, .sim-score { font-family:var(--mono); font-size:.7rem; color:var(--green); }
 
@@ -490,6 +498,7 @@ ul, ol { list-style:none; }
 .comparison-cols { display:grid; gap:1px; background:var(--border); border-radius:var(--r2) var(--r2) 0 0; overflow:hidden; margin-bottom:12px; }
 .comparison-col-header { background:var(--surface); padding:18px 14px; text-align:center; }
 .comparison-flag         { font-size:2.4rem; }
+.comparison-flag img     { width:56px; height:auto; border-radius:3px; display:block; margin:0 auto; }
 .comparison-country-name { font-family:var(--head); font-size:1rem; font-weight:700; margin-top:6px; }
 .comparison-score-big    { font-family:var(--mono); font-size:1.4rem; color:var(--green); margin-top:4px; font-weight:700; }
 .comparison-badges       { display:flex; flex-wrap:wrap; gap:4px; justify-content:center; margin-top:6px; }
