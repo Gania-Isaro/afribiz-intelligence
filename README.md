@@ -17,6 +17,11 @@ By putting all this data in one place, the dashboard saves time, reduces confusi
 
 ---
 
+## Demo Video
+Watch the full walkthrough here: [https://youtu.be/xsuXMcIENnI](https://youtu.be/xsuXMcIENnI)
+
+---
+
 ## Try it Out!
 You can access the live app through our load balancer:
 - **Main Link (HTTPS):** [https://afribiz-intelligence.gania.tech](https://afribiz-intelligence.gania.tech)
@@ -63,11 +68,110 @@ You don't need to install anything! Just follow these steps:
 ---
 
 ## How I Deployed It (The Technical Stuff)
-To make sure the app is always online and fast, I set up a professional web infrastructure:
 
-1. **Web Servers:** I used two Ubuntu servers (Web01 and Web02) running **Nginx** to host the files.
-2. **Load Balancer:** I set up a third server (Lb01) running **HAProxy**. Its job is to split the traffic between the two web servers so neither one gets too busy.
-3. **Redundancy:** If one web server goes down, the load balancer automatically sends everyone to the other one. Cool, right?
+### Infrastructure Overview
+| Server | Role | IP Address |
+|--------|------|------------|
+| Web01 | Nginx web server | 52.70.87.10 |
+| Web02 | Nginx web server | 3.93.218.74 |
+| Lb01 | HAProxy load balancer | 3.89.88.69 |
+
+---
+
+### Step 1 — Deploy to Web01 and Web02 (repeat for both)
+
+SSH into each web server:
+```bash
+ssh -i ~/.ssh/school ubuntu@52.70.87.10   # Web01
+ssh -i ~/.ssh/school ubuntu@3.93.218.74   # Web02
+```
+
+Install Nginx and create the web root:
+```bash
+sudo apt update && sudo apt install -y nginx
+sudo mkdir -p /var/www/afribiz-intelligence
+sudo chown -R ubuntu:ubuntu /var/www/afribiz-intelligence
+```
+
+From your **local machine**, copy the project files to each server:
+```bash
+scp -i ~/.ssh/school -r index.html css/ js/ images/ sw.js ubuntu@52.70.87.10:/var/www/afribiz-intelligence/
+scp -i ~/.ssh/school -r index.html css/ js/ images/ sw.js ubuntu@3.93.218.74:/var/www/afribiz-intelligence/
+```
+
+Copy the Nginx config and enable the site:
+```bash
+# On each web server:
+sudo cp /home/ubuntu/afribiz.conf /etc/nginx/sites-available/afribiz
+sudo ln -s /etc/nginx/sites-available/afribiz /etc/nginx/sites-enabled/afribiz
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+The Nginx config (`nginx/afribiz.conf`) sets:
+- Root directory: `/var/www/afribiz-intelligence`
+- SPA routing: all paths fall back to `index.html`
+- GNews API proxy at `/api/news/` to avoid browser CORS restrictions
+- Cache-Control headers: no-cache for HTML/service worker, 7-day immutable for static assets
+- Security headers: `X-Frame-Options`, `X-Content-Type-Options`, CSP, `Referrer-Policy`
+- Gzip compression for text, CSS, JS, and JSON
+
+---
+
+### Step 2 — Configure the Load Balancer (Lb01)
+
+SSH into the load balancer:
+```bash
+ssh -i ~/.ssh/school ubuntu@3.89.88.69
+```
+
+Install HAProxy and certbot:
+```bash
+sudo apt update && sudo apt install -y haproxy certbot
+```
+
+Get an SSL certificate for the domain:
+```bash
+sudo systemctl stop haproxy
+sudo certbot certonly --standalone -d afribiz-intelligence.gania.tech \
+  --non-interactive --agree-tos -m admin@gania.tech
+sudo mkdir -p /etc/haproxy/certs
+sudo cat /etc/letsencrypt/live/afribiz-intelligence.gania.tech/fullchain.pem \
+         /etc/letsencrypt/live/afribiz-intelligence.gania.tech/privkey.pem \
+  | sudo tee /etc/haproxy/certs/afribiz.pem > /dev/null
+sudo chmod 600 /etc/haproxy/certs/afribiz.pem
+```
+
+Copy the HAProxy config and start the service:
+```bash
+sudo cp /home/ubuntu/haproxy.cfg /etc/haproxy/haproxy.cfg
+sudo haproxy -c -f /etc/haproxy/haproxy.cfg   # validate config
+sudo systemctl enable haproxy && sudo systemctl start haproxy
+```
+
+The HAProxy config (`nginx/haproxy.cfg`) sets:
+- **Frontend HTTP (port 80):** Redirects all traffic to HTTPS (301), except Let's Encrypt ACME challenges
+- **Frontend HTTPS (port 443):** Terminates TLS with HTTP/2 support; applies rate limiting (100 req/10s per IP)
+- **Backend:** Round-robin between Web01 (`52.70.87.10:80`) and Web02 (`3.93.218.74:80`)
+- **Health checks:** `GET /` every 5 seconds; 3 failures → remove server, 2 successes → restore
+- **Attack blocking:** Blocks requests to `/wp-admin`, `/.env`, `/phpmyadmin`, etc.
+- **Stats:** Available at `127.0.0.1:8404/stats` (via SSH tunnel)
+
+---
+
+### Step 3 — Verify Load Balancing
+
+Check that traffic is distributed between both servers:
+```bash
+# From local machine — run several times and check which server responds
+for i in {1..6}; do curl -s https://afribiz-intelligence.gania.tech | grep -o "Web0[12]" ; done
+```
+
+Or check HAProxy stats via SSH tunnel:
+```bash
+ssh -i ~/.ssh/school -L 8404:127.0.0.1:8404 ubuntu@3.89.88.69
+# Then open http://localhost:8404/stats in your browser
+```
 
 ---
 
