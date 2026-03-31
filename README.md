@@ -37,7 +37,7 @@ Or directly through the individual servers:
 - **Live Data:** It fetches the latest info for all 54 African countries in real-time.
 - **Business Scores:** I created an algorithm that gives each country a score from 0 to 100 based on things like GDP, inflation, and internet access.
 - **Easy Filtering:** You can filter by region (like North or West Africa) and sort by what matters to you (best score, lowest inflation, etc.).
-- **Country Details:** Click on any country to see more details, including capital city, population, and even some business news!
+- **Country Details:** Click on any country to see a full profile: capital city, population, currency, score breakdown with trend arrows, a historical GDP trend chart, and a pros/cons analysis.
 - **Works Offline:** If you've visited before, the app saves the data so it still works even if you lose your internet connection.
 - **Dark Mode:** It looks great in both light and dark themes!
 
@@ -111,9 +111,8 @@ sudo nginx -t && sudo systemctl reload nginx
 The Nginx config (`nginx/afribiz.conf`) sets:
 - Root directory: `/var/www/afribiz-intelligence`
 - SPA routing: all paths fall back to `index.html`
-- GNews API proxy at `/api/news/` to avoid browser CORS restrictions
 - Cache-Control headers: no-cache for HTML/service worker, 7-day immutable for static assets
-- Security headers: `X-Frame-Options`, `X-Content-Type-Options`, CSP, `Referrer-Policy`
+- Security headers: `X-Frame-Options`, `X-Content-Type-Options`, CSP, `Referrer-Policy`, `Permissions-Policy`
 - Gzip compression for text, CSS, JS, and JSON
 
 ---
@@ -193,8 +192,8 @@ The biggest challenge was that the World Bank doesn't have data for every indica
 **2. Avoiding API rate limits**
 With 54 countries and multiple indicators each, a naive implementation would fire hundreds of API calls at once and hit rate limits immediately. I solved this by fetching indicators in batches of 8 countries at a time and caching all responses in `localStorage` for 4 hours — so the app only needs to make live calls once per session.
 
-**3. Client-side API key security**
-Because this is a pure frontend app with no backend server, API keys cannot be fully hidden from the browser. I minimized exposure by keeping keys out of any public `.env` files and providing them directly in the config. For a production app, the correct solution would be a backend proxy server that makes the API calls on behalf of the client.
+**3. API key security by design**
+This app was intentionally built using only open, keyless APIs — World Bank Open Data and REST Countries require no authentication at all. This means there are zero API keys to expose or manage on the client side. The Nginx server was also configured with a reverse-proxy location (`/api/news/`) so that any future authenticated API calls could be injected server-side, keeping keys completely out of the client JavaScript.
 
 **4. Consistent UI across 54 countries**
 Country names, flags, and metadata came from REST Countries API, but some entries used different name formats than the World Bank expected. I had to normalize country codes and handle edge cases where REST Countries returned extra metadata the app didn't need.
@@ -210,10 +209,10 @@ This application uses the following external APIs — thank you to their develop
 
 | API | Purpose | Documentation | Free Tier |
 |-----|---------|---------------|-----------|
-| [World Bank Open Data](https://datahelpdesk.worldbank.org/knowledgebase/articles/898599) | Business indicators & economic data | [API Docs](https://datahelpdesk.worldbank.org/knowledgebase/articles/898599) | No key required |
-| [REST Countries](https://restcountries.com) | Country names, flags, capitals, currencies | [API Docs](https://restcountries.com/#api-endpoints-v3) | No key required |
-| [GNews API](https://gnews.io) | Business news headlines per country | [API Docs](https://gnews.io/docs) | 100 requests/day |
-| [ExchangeRate-API](https://www.exchangerate-api.com) | Live currency conversion rates | [API Docs](https://www.exchangerate-api.com/docs) | 1,500 requests/month |
+| [World Bank Open Data](https://datahelpdesk.worldbank.org/knowledgebase/articles/898599) | Business indicators & economic data (GDP, inflation, unemployment, internet access, etc.) | [API Docs](https://datahelpdesk.worldbank.org/knowledgebase/articles/898599) | No key required |
+| [REST Countries](https://restcountries.com) | Country names, flags, capitals, currencies, languages, population | [API Docs](https://restcountries.com/#api-endpoints-v3) | No key required |
+
+> **No API keys are needed to run this project.** Both APIs are free and open — no registration, no `.env` file, no secrets to manage.
 
 ---
 
