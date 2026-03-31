@@ -39,7 +39,7 @@ Or hit the servers directly:
 - Filter by region (North, West, East, Central, South Africa) and sort by score, inflation, unemployment, or tax revenue
 - Search by country name
 - Click any country card to open a full profile with a score breakdown, historical trend chart, pros/cons, and similar countries
-- Compare Mode: toggle the switch in the sidebar, then click 2 or 3 country cards — a side-by-side comparison panel slides in showing all their indicators next to each other
+- Compare Mode: toggle the switch in the sidebar, then click 2 or 3 country cards - a side-by-side comparison panel slides in showing all their indicators next to each other
 - Full rankings table with all 54 countries
 - Caches everything in localStorage for 4 hours so repeat visits are instant
 - Dark mode toggle in the top right
@@ -62,7 +62,7 @@ python3 -m http.server 8080
 ```
 Then go to `http://localhost:8080`
 
-That's it. Both APIs used are completely free with no API keys needed — no `.env` file, nothing to configure.
+That's it. Both APIs used are completely free with no API keys needed - no `.env` file, nothing to configure.
 
 > **Note on `.gitignore`:** The repo includes a `.gitignore` that excludes `.env` files, `node_modules/`, OS files like `.DS_Store` and `Thumbs.db`, and editor folders. There are no secrets in this repo and nothing sensitive was ever committed.
 
@@ -80,7 +80,7 @@ That's it. Both APIs used are completely free with no API keys needed — no `.e
 
 ---
 
-### Step 1 — Deploy to Web01 and Web02
+### Step 1 - Deploy to Web01 and Web02
 
 SSH into each server:
 ```bash
@@ -125,7 +125,7 @@ The Nginx config sets:
 
 ---
 
-### Step 2 — Set Up the Load Balancer
+### Step 2 - Set Up the Load Balancer
 
 SSH into Lb01:
 ```bash
@@ -165,13 +165,13 @@ What the HAProxy config does:
 - Port 80 redirects everything to HTTPS (except Let's Encrypt challenges)
 - Port 443 terminates TLS, rate limits at 100 requests per 10 seconds per IP
 - Round-robin between Web01 and Web02
-- Health checks every 5 seconds — if a server fails 3 checks it gets removed, comes back after 2 successes
+- Health checks every 5 seconds - if a server fails 3 checks it gets removed, comes back after 2 successes
 - Blocks common attack paths like `/wp-admin`, `/.env`, `/phpmyadmin`
 - Stats page at `127.0.0.1:8404/stats` (only accessible through SSH tunnel)
 
 ---
 
-### Step 3 — Verify the Load Balancer is Working
+### Step 3 - Verify the Load Balancer is Working
 
 Check that the site responds through the load balancer:
 ```bash
@@ -187,8 +187,8 @@ content-type: text/plain
 
 Verify both backend servers are individually healthy:
 ```bash
-curl -sI http://52.70.87.10   # Web01 — expect HTTP/200
-curl -sI http://3.93.218.74   # Web02 — expect HTTP/200
+curl -sI http://52.70.87.10   # Web01 - expect HTTP/200
+curl -sI http://3.93.218.74   # Web02 - expect HTTP/200
 ```
 
 To see actual traffic distribution and server health, open the HAProxy stats page via SSH tunnel:
@@ -202,19 +202,19 @@ Then open `http://localhost:8404/stats` in your browser. It shows request counts
 ## Challenges
 
 **World Bank data gaps**
-The World Bank doesn't have data for every indicator for every country, especially for smaller or conflict-affected ones like South Sudan and Somalia. I made the scoring algorithm work with partial data — it still gives a score as long as at least 2 weighted indicators are available, and shows "N/A" for anything missing.
+The World Bank doesn't have data for every indicator for every country, especially for smaller or conflict-affected ones like South Sudan and Somalia. I made the scoring algorithm work with partial data - it still gives a score as long as at least 2 weighted indicators are available, and shows "N/A" for anything missing.
 
 **54 countries × multiple indicators = a lot of API calls**
 If you naively fetch all indicators for all 54 countries at once you get rate limited immediately. I fixed this by batching requests (8 countries at a time) and caching the results in localStorage for 4 hours. After the first load the app is basically instant.
 
 **API key security**
-I specifically chose APIs that don't require any keys — the World Bank Open Data API and REST Countries API are both completely open. This means there's nothing to accidentally expose in the client-side code. For the repo I still added a `.env` file template and a `.gitignore` that excludes it, so if someone forks this and adds a paid API later they have the pattern already set up.
+I specifically chose APIs that don't require any keys - the World Bank Open Data API and REST Countries API are both completely open. This means there's nothing to accidentally expose in the client-side code. For the repo I still added a `.env` file template and a `.gitignore` that excludes it, so if someone forks this and adds a paid API later they have the pattern already set up.
 
 **Country name mismatches**
 REST Countries and the World Bank use slightly different country names and codes in some cases. I had to normalize everything to ISO 3166-1 alpha-2 codes and manually handle a few edge cases where the two APIs disagreed on a country's name.
 
 **HAProxy config**
-Getting HAProxy to do HTTPS termination, redirect HTTP to HTTPS, run health checks, AND not break Let's Encrypt certificate renewal all at the same time took a few attempts. The ACME challenge handling was the tricky part — you have to let port 80 respond with 200 for `/.well-known/acme-challenge/` but redirect everything else.
+Getting HAProxy to do HTTPS termination, redirect HTTP to HTTPS, run health checks, AND not break Let's Encrypt certificate renewal all at the same time took a few attempts. The ACME challenge handling was the tricky part - you have to let port 80 respond with 200 for `/.well-known/acme-challenge/` but redirect everything else.
 
 ---
 
@@ -222,7 +222,7 @@ Getting HAProxy to do HTTPS termination, redirect HTTP to HTTPS, run health chec
 
 | API | What I used it for | Docs |
 |-----|--------------------|------|
-| [World Bank Open Data](https://datahelpdesk.worldbank.org/knowledgebase/articles/898599) | All the economic indicators — GDP, inflation, unemployment, internet/electricity access, tax revenue, corruption | [API Docs](https://datahelpdesk.worldbank.org/knowledgebase/articles/898599) |
+| [World Bank Open Data](https://datahelpdesk.worldbank.org/knowledgebase/articles/898599) | All the economic indicators - GDP, inflation, unemployment, internet/electricity access, tax revenue, corruption | [API Docs](https://datahelpdesk.worldbank.org/knowledgebase/articles/898599) |
 | [REST Countries](https://restcountries.com) | Country names, flags, capitals, currencies, languages, population | [API Docs](https://restcountries.com/#api-endpoints-v3) |
 
 No API keys required for either. Both are completely free and open.
