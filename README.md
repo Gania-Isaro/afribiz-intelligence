@@ -1,125 +1,133 @@
 # AfriBiz Intelligence
 
-Welcome to AfriBiz Intelligence is a simple dashboard that helps you understand business conditions across all 54 African countries.
+AfriBiz Intelligence is a dashboard I built to help people understand business conditions across all 54 African countries. The idea came from the fact that if you want to know where to start a business in Africa, you have to dig through long World Bank reports, Wikipedia pages, and random news articles just to get basic information. I wanted to put it all in one place.
 
-This tool is useful because it turns complex World Bank data into something easy to read and compare. Instead of going through long reports, you can quickly see which countries are growing, where business conditions are improving, and where risks might exist.
+It's mostly useful for students doing research, entrepreneurs trying to decide where to invest, or honestly anyone curious about how African economies compare to each other.
 
-For entrepreneurs, it helps you decide where to invest or expand.
-For students, it makes research faster and clearer.
-For anyone interested in Africa's economy, it gives a quick and reliable way to understand what is really happening across different countries.
-
-By putting all this data in one place, the dashboard saves time, reduces confusion, and helps you make better, data-driven decisions.
+No backend, no frameworks, just HTML, CSS, and JavaScript pulling from public APIs.
 
 ---
 
-## Snapshot
+## Screenshot
+
 ![App Screenshot](images/screenshot.png)
 
 ---
 
 ## Demo Video
-Watch the full walkthrough here: [https://youtu.be/xsuXMcIENnI](https://youtu.be/xsuXMcIENnI)
+
+[https://youtu.be/xsuXMcIENnI](https://youtu.be/xsuXMcIENnI)
 
 ---
 
-## Try it Out!
-You can access the live app through our load balancer:
-- **Main Link (HTTPS):** [https://afribiz-intelligence.gania.tech](https://afribiz-intelligence.gania.tech)
-- **Load Balancer (IP):** [http://3.89.88.69/](http://3.89.88.69/)
+## Live Links
 
-Or directly through the individual servers:
+Main link (goes through the load balancer):
+- [https://afribiz-intelligence.gania.tech](https://afribiz-intelligence.gania.tech)
+- [http://3.89.88.69/](http://3.89.88.69/)
+
+Or hit the servers directly:
 - Web01: [http://52.70.87.10/](http://52.70.87.10/)
 - Web02: [http://3.93.218.74/](http://3.93.218.74/)
 
 ---
 
-## What can it do?
-- **Live Data:** It fetches the latest info for all 54 African countries in real-time.
-- **Business Scores:** I created an algorithm that gives each country a score from 0 to 100 based on things like GDP, inflation, and internet access.
-- **Easy Filtering:** You can filter by region (like North or West Africa) and sort by what matters to you (best score, lowest inflation, etc.).
-- **Country Details:** Click on any country to see a full profile: capital city, population, currency, score breakdown with trend arrows, a historical GDP trend chart, and a pros/cons analysis.
-- **Works Offline:** If you've visited before, the app saves the data so it still works even if you lose your internet connection.
-- **Dark Mode:** It looks great in both light and dark themes!
+## What It Does
+
+- Fetches live data for all 54 African countries from the World Bank API
+- Scores each country from 0–100 using a weighted algorithm I made (GDP, inflation, unemployment, internet access, electricity access, tax revenue, corruption data)
+- Filter by region (North, West, East, Central, South Africa) and sort by score, inflation, unemployment, or tax revenue
+- Search by country name
+- Click any country card to open a full profile with a score breakdown, historical trend chart, pros/cons, and similar countries
+- Compare Mode: toggle the switch in the sidebar, then click 2 or 3 country cards — a side-by-side comparison panel slides in showing all their indicators next to each other
+- Full rankings table with all 54 countries
+- Caches everything in localStorage for 4 hours so repeat visits are instant
+- Dark mode toggle in the top right
 
 ---
 
-## How I Built It
-I wanted to keep this project simple and fast, so I didn't use any fancy frameworks like React or Vue. It's built with:
-- **HTML5 & CSS3:** For the structure and beautiful design.
-- **Vanilla JavaScript:** For all the logic and fetching data.
-- **World Bank API:** This is where all the economic data comes from.
-- **REST Countries API:** Used for flags and basic country info.
-- **GNews API:** To show the latest business headlines.
+## Running It Locally
+
+No install needed.
+
+1. Clone the repo:
+```bash
+git clone https://github.com/Gania-Isaro/afribiz-intelligence.git
+cd afribiz-intelligence
+```
+
+2. Open `index.html` directly in your browser, or serve it with Python if you want proper MIME types:
+```bash
+python3 -m http.server 8080
+```
+Then go to `http://localhost:8080`
+
+That's it. Both APIs used are completely free with no API keys needed — no `.env` file, nothing to configure.
+
+> **Note on `.gitignore`:** The repo includes a `.gitignore` that excludes `.env` files, `node_modules/`, OS files like `.DS_Store` and `Thumbs.db`, and editor folders. There are no secrets in this repo and nothing sensitive was ever committed.
 
 ---
 
-## Running it on Your Computer
-You don't need to install anything! Just follow these steps:
+## Deployment
 
-1. **Clone this project:**
-   ```bash
-   git clone https://github.com/Gania-Isaro/afribiz-intelligence.git
-   cd afribiz-intelligence
-   ```
-2. **Open the app:**
-   - Just double-click `index.html` in your file explorer.
-   - Or, if you have Python, run: `python3 -m http.server 8080` and go to `localhost:8080`.
+### Servers
+
+| Server | Role | IP |
+|--------|------|----|
+| Web01 | Nginx | 52.70.87.10 |
+| Web02 | Nginx | 3.93.218.74 |
+| Lb01 | HAProxy (load balancer) | 3.89.88.69 |
 
 ---
 
-## How I Deployed It (The Technical Stuff)
+### Step 1 — Deploy to Web01 and Web02
 
-### Infrastructure Overview
-| Server | Role | IP Address |
-|--------|------|------------|
-| Web01 | Nginx web server | 52.70.87.10 |
-| Web02 | Nginx web server | 3.93.218.74 |
-| Lb01 | HAProxy load balancer | 3.89.88.69 |
-
----
-
-### Step 1 — Deploy to Web01 and Web02 (repeat for both)
-
-SSH into each web server:
+SSH into each server:
 ```bash
 ssh -i ~/.ssh/school ubuntu@52.70.87.10   # Web01
 ssh -i ~/.ssh/school ubuntu@3.93.218.74   # Web02
 ```
 
-Install Nginx and create the web root:
+Install Nginx and set up the web root:
 ```bash
 sudo apt update && sudo apt install -y nginx
 sudo mkdir -p /var/www/afribiz-intelligence
 sudo chown -R ubuntu:ubuntu /var/www/afribiz-intelligence
 ```
 
-From your **local machine**, copy the project files to each server:
+From your local machine, copy the app files to each server:
 ```bash
 scp -i ~/.ssh/school -r index.html css/ js/ images/ sw.js ubuntu@52.70.87.10:/var/www/afribiz-intelligence/
 scp -i ~/.ssh/school -r index.html css/ js/ images/ sw.js ubuntu@3.93.218.74:/var/www/afribiz-intelligence/
 ```
 
-Copy the Nginx config and enable the site:
+Copy the Nginx config to each server and enable it:
 ```bash
-# On each web server:
+scp -i ~/.ssh/school nginx/afribiz.conf ubuntu@52.70.87.10:/home/ubuntu/afribiz.conf
+scp -i ~/.ssh/school nginx/afribiz.conf ubuntu@3.93.218.74:/home/ubuntu/afribiz.conf
+```
+
+Then on each server:
+```bash
 sudo cp /home/ubuntu/afribiz.conf /etc/nginx/sites-available/afribiz
 sudo ln -s /etc/nginx/sites-available/afribiz /etc/nginx/sites-enabled/afribiz
 sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
-The Nginx config (`nginx/afribiz.conf`) sets:
-- Root directory: `/var/www/afribiz-intelligence`
-- SPA routing: all paths fall back to `index.html`
-- Cache-Control headers: no-cache for HTML/service worker, 7-day immutable for static assets
+The Nginx config sets:
+- Root: `/var/www/afribiz-intelligence`
+- All routes fall back to `index.html`
+- No-cache on HTML and the service worker file
+- 7-day cache on CSS/JS/images
 - Security headers: `X-Frame-Options`, `X-Content-Type-Options`, CSP, `Referrer-Policy`, `Permissions-Policy`
-- Gzip compression for text, CSS, JS, and JSON
+- Gzip on
 
 ---
 
-### Step 2 — Configure the Load Balancer (Lb01)
+### Step 2 — Set Up the Load Balancer
 
-SSH into the load balancer:
+SSH into Lb01:
 ```bash
 ssh -i ~/.ssh/school ubuntu@3.89.88.69
 ```
@@ -129,7 +137,7 @@ Install HAProxy and certbot:
 sudo apt update && sudo apt install -y haproxy certbot
 ```
 
-Get an SSL certificate for the domain:
+Get an SSL certificate:
 ```bash
 sudo systemctl stop haproxy
 sudo certbot certonly --standalone -d afribiz-intelligence.gania.tech \
@@ -141,88 +149,89 @@ sudo cat /etc/letsencrypt/live/afribiz-intelligence.gania.tech/fullchain.pem \
 sudo chmod 600 /etc/haproxy/certs/afribiz.pem
 ```
 
-Copy the HAProxy config and start the service:
+Copy the HAProxy config to the server and start it:
+```bash
+scp -i ~/.ssh/school nginx/haproxy.cfg ubuntu@3.89.88.69:/home/ubuntu/haproxy.cfg
+```
+
+Then on the load balancer:
 ```bash
 sudo cp /home/ubuntu/haproxy.cfg /etc/haproxy/haproxy.cfg
-sudo haproxy -c -f /etc/haproxy/haproxy.cfg   # validate config
+sudo haproxy -c -f /etc/haproxy/haproxy.cfg
 sudo systemctl enable haproxy && sudo systemctl start haproxy
 ```
 
-The HAProxy config (`nginx/haproxy.cfg`) sets:
-- **Frontend HTTP (port 80):** Redirects all traffic to HTTPS (301), except Let's Encrypt ACME challenges
-- **Frontend HTTPS (port 443):** Terminates TLS with HTTP/2 support; applies rate limiting (100 req/10s per IP)
-- **Backend:** Round-robin between Web01 (`52.70.87.10:80`) and Web02 (`3.93.218.74:80`)
-- **Health checks:** `GET /` every 5 seconds; 3 failures → remove server, 2 successes → restore
-- **Attack blocking:** Blocks requests to `/wp-admin`, `/.env`, `/phpmyadmin`, etc.
-- **Stats:** Available at `127.0.0.1:8404/stats` (via SSH tunnel)
+What the HAProxy config does:
+- Port 80 redirects everything to HTTPS (except Let's Encrypt challenges)
+- Port 443 terminates TLS, rate limits at 100 requests per 10 seconds per IP
+- Round-robin between Web01 and Web02
+- Health checks every 5 seconds — if a server fails 3 checks it gets removed, comes back after 2 successes
+- Blocks common attack paths like `/wp-admin`, `/.env`, `/phpmyadmin`
+- Stats page at `127.0.0.1:8404/stats` (only accessible through SSH tunnel)
 
 ---
 
-### Step 3 — Verify Load Balancing
+### Step 3 — Verify the Load Balancer is Working
 
-Check that traffic is distributed between both servers:
+Check that the site responds through the load balancer:
 ```bash
-# From local machine — run several times and check which server responds
-for i in {1..6}; do curl -s https://afribiz-intelligence.gania.tech | grep -o "Web0[12]" ; done
+curl -sI https://afribiz-intelligence.gania.tech/health
 ```
 
-Or check HAProxy stats via SSH tunnel:
+Expected output:
+```
+HTTP/2 200
+content-type: text/plain
+...
+```
+
+Verify both backend servers are individually healthy:
+```bash
+curl -sI http://52.70.87.10   # Web01 — expect HTTP/200
+curl -sI http://3.93.218.74   # Web02 — expect HTTP/200
+```
+
+To see actual traffic distribution and server health, open the HAProxy stats page via SSH tunnel:
 ```bash
 ssh -i ~/.ssh/school -L 8404:127.0.0.1:8404 ubuntu@3.89.88.69
-# Then open http://localhost:8404/stats in your browser
 ```
+Then open `http://localhost:8404/stats` in your browser. It shows request counts per backend, uptime, and health check status for both servers. In my testing Web01 and Web02 were both green and the session counts were roughly equal after a few page loads, confirming round-robin is working.
 
 ---
 
-## What I Learned
-Working on this project was a huge learning experience for me. I learned:
-- How to fetch and handle data from multiple APIs at once.
-- How to build a custom "scoring" system to rank countries.
-- The importance of **caching** (saving data locally) to make apps faster and work offline.
-- How to set up and configure **Nginx** and **HAProxy** on Linux servers.
-- How to keep code clean and organized without using big frameworks.
+## Challenges
+
+**World Bank data gaps**
+The World Bank doesn't have data for every indicator for every country, especially for smaller or conflict-affected ones like South Sudan and Somalia. I made the scoring algorithm work with partial data — it still gives a score as long as at least 2 weighted indicators are available, and shows "N/A" for anything missing.
+
+**54 countries × multiple indicators = a lot of API calls**
+If you naively fetch all indicators for all 54 countries at once you get rate limited immediately. I fixed this by batching requests (8 countries at a time) and caching the results in localStorage for 4 hours. After the first load the app is basically instant.
+
+**API key security**
+I specifically chose APIs that don't require any keys — the World Bank Open Data API and REST Countries API are both completely open. This means there's nothing to accidentally expose in the client-side code. For the repo I still added a `.env` file template and a `.gitignore` that excludes it, so if someone forks this and adds a paid API later they have the pattern already set up.
+
+**Country name mismatches**
+REST Countries and the World Bank use slightly different country names and codes in some cases. I had to normalize everything to ISO 3166-1 alpha-2 codes and manually handle a few edge cases where the two APIs disagreed on a country's name.
+
+**HAProxy config**
+Getting HAProxy to do HTTPS termination, redirect HTTP to HTTPS, run health checks, AND not break Let's Encrypt certificate renewal all at the same time took a few attempts. The ACME challenge handling was the tricky part — you have to let port 80 respond with 200 for `/.well-known/acme-challenge/` but redirect everything else.
 
 ---
 
-## Challenges I Faced
+## APIs Used
 
-**1. World Bank API data gaps**
-The biggest challenge was that the World Bank doesn't have data for every indicator for every country — especially smaller or conflict-affected nations like South Sudan or Somalia. I solved this by making the scoring algorithm flexible: it still calculates a score if at least 2 out of the weighted indicators have data, and it gracefully shows "N/A" for anything missing.
+| API | What I used it for | Docs |
+|-----|--------------------|------|
+| [World Bank Open Data](https://datahelpdesk.worldbank.org/knowledgebase/articles/898599) | All the economic indicators — GDP, inflation, unemployment, internet/electricity access, tax revenue, corruption | [API Docs](https://datahelpdesk.worldbank.org/knowledgebase/articles/898599) |
+| [REST Countries](https://restcountries.com) | Country names, flags, capitals, currencies, languages, population | [API Docs](https://restcountries.com/#api-endpoints-v3) |
 
-**2. Avoiding API rate limits**
-With 54 countries and multiple indicators each, a naive implementation would fire hundreds of API calls at once and hit rate limits immediately. I solved this by fetching indicators in batches of 8 countries at a time and caching all responses in `localStorage` for 4 hours — so the app only needs to make live calls once per session.
-
-**3. API key security by design**
-This app was intentionally built using only open, keyless APIs — World Bank Open Data and REST Countries require no authentication at all. This means there are zero API keys to expose or manage on the client side. The Nginx server was also configured with a reverse-proxy location (`/api/news/`) so that any future authenticated API calls could be injected server-side, keeping keys completely out of the client JavaScript.
-
-**4. Consistent UI across 54 countries**
-Country names, flags, and metadata came from REST Countries API, but some entries used different name formats than the World Bank expected. I had to normalize country codes and handle edge cases where REST Countries returned extra metadata the app didn't need.
-
-**5. Load balancer configuration**
-Setting up HAProxy to correctly distribute traffic between two Nginx servers while ensuring session consistency took several iterations. I had to configure health checks so the load balancer would automatically stop sending traffic to a server that went down.
-
----
-
-## API Credits & Documentation
-
-This application uses the following external APIs — thank you to their developers:
-
-| API | Purpose | Documentation | Free Tier |
-|-----|---------|---------------|-----------|
-| [World Bank Open Data](https://datahelpdesk.worldbank.org/knowledgebase/articles/898599) | Business indicators & economic data (GDP, inflation, unemployment, internet access, etc.) | [API Docs](https://datahelpdesk.worldbank.org/knowledgebase/articles/898599) | No key required |
-| [REST Countries](https://restcountries.com) | Country names, flags, capitals, currencies, languages, population | [API Docs](https://restcountries.com/#api-endpoints-v3) | No key required |
-
-> **No API keys are needed to run this project.** Both APIs are free and open — no registration, no `.env` file, no secrets to manage.
+No API keys required for either. Both are completely free and open.
 
 ---
 
 ## Project Info
+
 - **School:** African Leadership University (ALU)
 - **Course:** Web Infrastructure
 - **Year:** 2026
 - **Author:** Gania Isaro
-
----
-
-## License
-This project is licensed under the MIT License - feel free to use it for your own learning!
